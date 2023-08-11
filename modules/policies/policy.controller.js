@@ -10,12 +10,10 @@ class PolicyController {
   async addPolicy(payload) {
     //versioning of the new-policies based on the timestamp
     const policy_version = moment(Date.now()).format("YYYY-MM-DD-HHmmss");
-    payload.policy_version = `POLICY-${policy_version}-${policy_version}`;
+    payload.policy_version = `POLICY-${payload.assetId}-${policy_version}`;
 
-    console.log('@@@@@@@@@@@@',payload);
     const policypayload = { ...payload };
-
-    return await Model.newPolicy(policypayload);
+    return await Model.create(policypayload);
   }
 
   newPolicy(payload) {
@@ -23,7 +21,7 @@ class PolicyController {
   }
 
   getById(id) {
-    return Model.findById(id).populate("goats");
+    return Model.findById(id);
   }
 
   getByName(name) {

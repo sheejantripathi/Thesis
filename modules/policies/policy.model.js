@@ -17,7 +17,7 @@ const requesterAttributesSchema = new Schema({
 
 const customPolicySchema = new Schema(
   {
-    policy_identifier: { type: String, required: true },
+    policy_version: { type: String, required: true },
     assetId: { type: String, required: true },
     data_sensitivity_level: { type: String, enum: ['public', 'internal', 'confidential', 'classified'] },
     requester_attributes: [requesterAttributesSchema],
