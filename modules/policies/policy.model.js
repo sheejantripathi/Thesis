@@ -1,20 +1,26 @@
 const mongoose = require('mongoose');
-const { Schema } = mongoose;
+const Schema = mongoose.Schema;
+
+const requesterAttributesSchema = new Schema({
+  role: { type: String, required: true },
+  organization: { type: String, required: true },
+  organization_type: {
+    type: String,
+    enum: ["individual", "group"],
+    required: true,
+  },
+  reputation: String,
+  access_frequency: Number,
+  data_usage: [{ type: String, enum: ['read-only', 'edit-only', 'full-access'] }],
+  days_of_access: {type: String, required: true},
+});
 
 const customPolicySchema = new Schema(
   {
-    policy_id: { type: Schema.Types.ObjectId, ref: "Policy", required: true },
-    temporal: { type: Number, required: true },
-    geo_location: String,
-    requester_attributes: {
-      role: { type: String, required: true },
-      organization: { type: String, required: true },
-      organization_type: {
-        type: String,
-        enum: ["individual", "group"],
-        required: true,
-      },
-    },
+    policy_identifier: { type: String, required: true },
+    assetId: { type: String, required: true },
+    data_sensitivity_level: { type: String, enum: ['public', 'internal', 'confidential', 'classified'] },
+    requester_attributes: [requesterAttributesSchema],
   },
   {
     collection: 'custom_policies',
@@ -24,31 +30,4 @@ const customPolicySchema = new Schema(
   }
 );
 
-// Indexes for better query performance
-customPolicySchema.index({ policy_id: 1 });
-customPolicySchema.index({ temporal: 1 });
-customPolicySchema.index({ geo_location: 1 });
-customPolicySchema.index({ "requester_attributes.role": 1 });
-customPolicySchema.index({ "requester_attributes.organization": 1 });
-customPolicySchema.index({ "requester_attributes.organization_type": 1 });
-
-// Virtuals
-customPolicySchema.virtual('requester_full_name').get(function () {
-  return `${this.requester_attributes.organization} - ${this.requester_attributes.role}`;
-});
-
-// Pre-save hook for data validation or modifications
-customPolicySchema.pre('save', function (next) {
-  // Perform data validation or modifications
-  next();
-});
-
-// Post-save hook for post-save processing
-customPolicySchema.post('save', function (doc) {
-  // Perform post-save processing
-});
-
-// Create and export the CustomPolicy model
-const CustomPolicy = mongoose.model('CustomPolicy', customPolicySchema);
-
-module.exports = CustomPolicy;
+module.exports = mongoose.model('CustomPolicy', customPolicySchema);

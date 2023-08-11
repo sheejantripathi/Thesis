@@ -1,0 +1,8 @@
+{
+  "api_v1": {
+    "policies": "../../modules/policies/policy.routes.api"
+  },
+  "ui": {
+    "policies": "../../modules/policies/policy.routes.ui"
+  }
+}
