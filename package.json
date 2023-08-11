@@ -4,7 +4,18 @@
   "description": "Master's Thesis Implementation",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "nodemon ./bin/www",
+    "production": "ENV_TYPE=production yarn build && node ./bin/www",
+    "client": "cd ./client && yarn dev",
+    "setup": "yarn install && cd ./client && yarn install",
+    "build": "ENV_TYPE=production yarn install && cd ./client && yarn install && yarn run prod"
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "public/*",
+      "client/*",
+      "config/*"
+    ]
   },
   "repository": {
     "type": "git",
@@ -18,12 +29,17 @@
   "homepage": "https://github.com/sheejantripathi/Thesis#readme",
   "dependencies": {
     "body-parser": "^1.20.2",
+    "config": "^3.3.9",
     "cors": "^2.8.5",
+    "ejs": "^3.1.9",
     "express": "^4.18.2",
     "helmet": "^7.0.0",
     "joi": "^17.9.2",
     "jsonwebtoken": "^9.0.1",
+    "moment": "^2.29.4",
     "mongoose": "^7.4.1",
-    "morgan": "^1.10.0"
+    "morgan": "^1.10.0",
+    "nodemon": "^3.0.1",
+    "ws": "^8.13.0"
   }
 }
