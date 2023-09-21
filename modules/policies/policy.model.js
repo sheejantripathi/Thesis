@@ -4,15 +4,12 @@ const Schema = mongoose.Schema;
 const requesterAttributesSchema = new Schema({
   role: { type: String, required: true },
   organization: { type: String, required: true },
-  organization_type: {
-    type: String,
-    enum: ["individual", "group"],
-    required: true,
-  },
   reputation: String,
   access_frequency: Number,
-  data_usage: [{ type: String, enum: ['read-only', 'edit-only', 'full-access'] }],
+  permissions: [{ type: String, enum: ['read-only', 'edit-only', 'full-access'] }],
   days_of_access: {type: String, required: true},
+  email_filter: String,
+  location_based: [{latitude: String, longitude: String}]
 });
 
 const customPolicySchema = new Schema(
