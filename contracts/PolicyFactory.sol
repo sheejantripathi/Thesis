@@ -4,13 +4,14 @@ pragma solidity ^0.8.6;
 import "./EnforceablePolicy.sol";
 
 contract SmartContractFactory {
-    event NewSmartContract(address indexed creator, address smartContractAddress, address indexed dataRequester, string permission, uint256 startTime, uint256 endTime);
+    event NewSmartContract(address indexed creator, address smartContractAddress, 
+    address indexed dataRequester, string permission, uint256 access_from, uint256 access_to);
 
     struct Policy {
         address user;
         string permission;
-        uint256 startTime;
-        uint256 endTime;
+        uint256 access_from;
+        uint256 access_to;
     }
 
     Policy[] public policies;
@@ -22,7 +23,7 @@ contract SmartContractFactory {
     function createSmartContracts() public {
         // Validate the Ethereum address
         require(validateEthereumAddress(dataRequester), "Invalid Ethereum address");
-        
+
         for (uint256 i = 0; i < policies.length; i++) {
             Policy memory policy = policies[i];
             EnforceableSmartContract newSmartContract = new EnforceableSmartContract(policy.user, policy.permission, policy.startTime, policy.endTime);

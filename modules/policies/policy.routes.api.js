@@ -1,24 +1,27 @@
-const express = require('express');
-const router = express.Router();
+const router = require("express").Router();
 const { Web3 } = require('web3');
 const Controller = require("./policy.controller");
-const multer = require('multer');
+const authenticateToken = require("../../helpers/utils/jwt-middleware");
 
 const providers = new Web3.providers.HttpProvider('http://127.00.1:9545');
 var web3 = new Web3(providers)
 
-const upload = multer({ dest: '../../uploads' });
+const multer = require("multer");
+const upload = multer({ dest: "uploads/" });
 
 // API to add the custom policies
-router.post('/add', upload.single('file'), async (req, res, next) => {
-  if (!req.file) {
+router.post('/add', authenticateToken, async (req, res, next) => {
+  // console.log(req.file, req.files)
+  if (!req.files) {
     return res.status(400).send('No file uploaded.');
   }
 
   let payload = req.body;
-  payload.filePath = req.file.path;
+  payload.asset_owner = req.user.id
+  const fileToUpload = req.files.file0;
+  const fileContent = fileToUpload.data;
 
-    await Controller.addPolicy(payload)
+    await Controller.addPolicy(payload, fileContent)
     .then((u) => res.json(u))
     .catch((error_msg) => next(error_msg));
 });
