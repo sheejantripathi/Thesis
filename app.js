@@ -4,6 +4,12 @@ const cors = require('cors');
 const logger = require('morgan');
 const mongoose = require('mongoose');
 const config = require('config');
+var fileupload = require("express-fileupload");
+const { expressjwt }  = require("express-jwt");
+
+const configuration = require("./modules/users/config");
+
+
 // var compression = require("compression");
 
 const app = express();
@@ -40,6 +46,9 @@ app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(fileupload());
+// app.use(expressjwt(configuration));
+// app.use(jwtMiddleware)
 
 app.use('/', routeManager);
 
