@@ -4,7 +4,6 @@ const Model = require("./user.model");
 
 class UserController {
     async findUser(payload) {
-        // console.log(payload)
         let result = await Model.findOne(payload);
         return result ? result : '';
     }
@@ -14,7 +13,6 @@ class UserController {
     }
 
     async addUser(payload) {
-        console.log(payload)
         return Model.create(payload)
     }
 

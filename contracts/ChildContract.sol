@@ -1,57 +1,68 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.6;
+pragma solidity >=0.7.0 <0.9.0;
 
 contract ChildContract {
-    address public parentContract;
-    
-    // Define a struct to store policy data
-    struct PolicyData {
-        bool hasAccess;
-        string accessType;
-        uint256 accessFrom;
-        uint256 accessTo;
-    }
-    
-    // Mapping to store policy data for each user
-    mapping(address => PolicyData) public userPolicies;
 
-    constructor() {
-        parentContract = msg.sender;
-    }
+    string public userAttribute;
+    address public dataOwnerAddress;
+    string public permissions;
+    uint256 public accessFrom;
+    uint256 public accessTo;
+    string public assetCID;
+    string public assetName;
 
-    modifier onlyParentContract() {
-        require(msg.sender == parentContract, "Only the parent contract can call this function");
-        _;
-    }
+    // Mapping to store user EOA addresses to this child contract address
+    mapping(address => bool) public userToContract;
+    event success (string reason);
 
-    function setPolicy(
-        address userAddress,
-        bool hasAccess,
-        string memory accessType,
-        uint256 accessFrom,
-        uint256 accessTo
-    ) public onlyParentContract {
-        PolicyData memory policy = PolicyData({
-            hasAccess: hasAccess,
-            accessType: accessType,
-            accessFrom: accessFrom,
-            accessTo: accessTo
-        });
-
-        userPolicies[userAddress] = policy;
+    constructor(
+        string memory _userAttribute,
+        address _dataOwnerAddress,
+        string memory _permissions,
+        uint256 _accessFrom,
+        uint256 _accessTo,
+        string memory _assetCID,
+        string memory _assetName
+    ) {
+        userAttribute = _userAttribute;
+        dataOwnerAddress = _dataOwnerAddress;
+        permissions = _permissions;
+        accessFrom = _accessFrom;
+        accessTo = _accessTo;
+        assetCID = _assetCID;
+        assetName = _assetName;
     }
 
-    function getPolicy(address userAddress) public view returns (PolicyData memory) {
-        return userPolicies[userAddress];
+    function getContractDetails() public view returns (
+        string memory,
+        address,
+        string memory,
+        uint256,
+        uint256,
+        string memory,
+        string memory
+    ) {
+        return (
+            userAttribute,
+            dataOwnerAddress,
+            permissions,
+            accessFrom,
+            accessTo,
+            assetCID,
+            assetName
+        );
     }
 
-    function validateAccess(address userAddress) public view returns (bool) {
-        PolicyData memory policy = userPolicies[userAddress];
+    // Function to associate a specific EOA address with this contract
+   
 
-        // Validate the policy based on specific conditions
-        // Here, you would implement your access validation logic
+    function associateUserToContract(address userAddress) public {
+        require(userAddress != address(0), "Invalid user address");
+        userToContract[userAddress] = true;
+        emit success("Transaction successful");
+    }
 
-        // For simplicity, always grant access if hasAccess is true
-        return policy.hasAccess;
+    function isUserAssociated(address userAddress) public view returns (bool) {
+        return userToContract[userAddress];
     }
 }

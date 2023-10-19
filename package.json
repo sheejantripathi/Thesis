@@ -28,6 +28,7 @@
   },
   "homepage": "https://github.com/sheejantripathi/Thesis#readme",
   "dependencies": {
+    "@ganache/console.log": "^0.4.1",
     "@helia/unixfs": "^1.4.2",
     "@metamask/eth-sig-util": "^7.0.0",
     "blockstore-core": "^4.3.4",
@@ -39,6 +40,7 @@
     "dotenv": "^16.3.1",
     "ejs": "^3.1.9",
     "ethereumjs-util": "^7.1.5",
+    "ethers": "^6.7.1",
     "express": "^4.18.2",
     "express-fileupload": "^1.4.0",
     "express-jwt": "^8.4.1",
