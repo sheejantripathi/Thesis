@@ -9,7 +9,7 @@ class TransactionsController {
     }
     
     async getByOwner(ownerAddress) {
-        let result = await Transaction.find({ ownerAddress: ownerAddress }).populate('assetID');
+        let result = await Transaction.find({ ownerAddress: ownerAddress }).populate('policyId');
         return result;
       }
 

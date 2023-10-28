@@ -6,19 +6,22 @@ const notebookSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  fileName: {
-    type: String,
-    required: true,
-  },
-  fileCID: {
-    type: String,
-    required: true,
-  },
-  fileType: {
-    type: String,
-    required: true,
-    default: '.ipynb',
-  },
+  fileDetails:[
+    {
+      name: {
+        type: String,
+        required: true,
+      },
+      CID: {
+        type: String,
+      },
+      type: {
+        type: String,
+        required: true,
+        default: '.ipynb',
+      },
+    }
+  ],
 },
 {
   collection: 'notebooks',

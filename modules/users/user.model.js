@@ -7,12 +7,14 @@ const userSchema = new mongoose.Schema({
     required: true,
     default: () => Math.floor(Math.random() * 1000000)
   },
-  shared_file: {
-    fileId: {
+  policies: [{
      type: ObjectId,
-     ref: 'Notebook',
-    },
-  },
+     ref: 'CustomPolicy',
+  }],
+  groups: [{
+    contractAddress: String,
+    name: String,
+ }],
   publicAddress: {
     type: String,
     required: true,

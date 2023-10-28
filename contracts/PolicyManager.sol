@@ -8,18 +8,17 @@ contract PolicyManager {
 
     address public owner;
     // mapping(address => address) public userToChildContract;
-    mapping(string => mapping(string => mapping(string => bool))) private attributeToAssetToContractExists;
+    mapping(string => mapping(string => bool)) private groupToContractExists;
     ChildContract[] policies;
 
     // Array to store metadata about the deployed contracts
     struct ContractMetadata {
         address contractAddress;
-        string assetName;
     }
   
     ContractMetadata[] public deployedContracts;
 
-    event ChildContractCreated(string indexed attribute, address childContract);
+    event ChildContractCreated(string indexed group, address childContract);
 
     constructor() {
         owner = msg.sender;
@@ -32,9 +31,7 @@ contract PolicyManager {
         address _dataOwnerAddress,
         string memory _permissions,
         uint256 _accessFrom,
-        uint256 _accessTo,
-        string memory _assetCID,
-        string memory _assetName
+        uint256 _accessTo
     ) external {
 
         // Log additional information about the parameters
@@ -44,15 +41,13 @@ contract PolicyManager {
         require(_dataOwnerAddress == owner, "Only owner can invoke the child contract creation");
         require(_accessFrom < _accessTo, "Invalid access time, accessFrom should be less than accessTo");
         // Check if a child contract already exists for this user and permissions
-        require(!attributeToAssetToContractExists[_userAttribute][_permissions][_assetCID], "Policy Contract already exists for this attribute, specific to this asset");
+        require(!groupToContractExists[_userAttribute][_permissions], "Policy Contract already exists for this group, specific to this asset");
         
         ChildContract childContract = new ChildContract(_userAttribute,
             _dataOwnerAddress,
             _permissions,
             _accessFrom,
-            _accessTo,
-            _assetCID,
-            _assetName);
+            _accessTo);
 
         policies.push(childContract);
 
@@ -63,7 +58,7 @@ contract PolicyManager {
         // }));
 
         // console.log("Child contract address: %s", address(childContract));
-        // attributeToAssetToContractExists[_userAttribute][_permissions][_assetCID] = true;
+        // groupToAssetToContractExists[_userAttribute][_permissions][_assetCID] = true;
 
         emit ChildContractCreated(_userAttribute, address(childContract));
         emit success('User Policy Definitions registered successfully!!');
@@ -73,7 +68,7 @@ contract PolicyManager {
     // function validateAccess(string memory _userAttribute) public view returns (bool) {
     //     require(_userAddress != address(0), "Invalid user address");
 
-    //     address childContractAddress = attributeToAssetToContractExists[_userAttribute];
+    //     address childContractAddress = groupToAssetToContractExists[_userAttribute];
     //     require(childContractAddress != address(0), "Child contract not found");
 
     //     return ChildContract(childContractAddress).validateAccess();
@@ -88,10 +83,10 @@ contract PolicyManager {
         return deployedContracts.length;
     }
 
-    function getContractMetadata(uint256 index) public view returns (address, string memory) {
+    function getContractMetadata(uint256 index) public view returns (address) {
         require(index < deployedContracts.length, "Invalid index");
         ContractMetadata memory metadata = deployedContracts[index];
-        return (metadata.contractAddress, metadata.assetName);
+        return (metadata.contractAddress);
     }
 
     // New function to retrieve metadata about deployed contracts
