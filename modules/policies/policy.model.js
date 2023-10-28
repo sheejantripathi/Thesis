@@ -17,7 +17,6 @@ const requesterAttributesSchema = new Schema({
 const customPolicySchema = new Schema(
   {
     policy_version: { type: String, required: true },
-    assetId: { type: ObjectId, ref: 'Notebook'},
     contract_details: requesterAttributesSchema,
     asset_owner: { type: String },
   },
