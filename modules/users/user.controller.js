@@ -2,11 +2,18 @@ const mongoose = require("mongoose");
 
 const Model = require("./user.model");
 const instanceController = require('../contractInstances/instances.controller');
+const NodeRSA = require('node-rsa');
 
 class UserController {
     async findUser(payload) {
+      console.log(payload, 'payload')
         let result = await Model.findOne(payload);
         return result ? result : '';
+    }
+
+    async findbyAddress(address) {
+      let result = await Model.findOne({publicAddress: address});
+      return result ? result : '';
     }
 
     async getById(userID) {
@@ -14,19 +21,78 @@ class UserController {
     }
 
     async addUser(payload) {
-        return Model.create(payload)
+        const { generateKeyPair } = require('crypto');
+
+        try {
+            const generateKeyPairAsync = () => {
+              return new Promise((resolve, reject) => {
+                generateKeyPair(
+                  'rsa',
+                  {
+                    modulusLength: 4096,
+                    publicKeyEncoding: {
+                      type: 'spki',
+                      format: 'pem',
+                    },
+                    privateKeyEncoding: {
+                      type: 'pkcs8',
+                      format: 'pem',
+                      cipher: 'aes-256-cbc',
+                      passphrase: 'top secret',
+                    },
+                  },
+                  (err, publicKey, privateKey) => {
+                    if (err) {
+                      reject(err);
+                    } else {
+                      resolve({ publicKey, privateKey });
+                    }
+                  }
+                );
+              });
+            };
+        
+            // Wait for the key pair generation to complete
+            const { publicKey, privateKey } = await generateKeyPairAsync();
+        
+            const payloadWithKeys = {...payload, publicKey, privateKey };
+            const createdModel = await Model.create(payloadWithKeys);
+            return createdModel;
+          } catch (error) {
+            console.error('Error:', error);
+          }
     }
 
-    async updateUser(userID, payload) {
-        return Model.findByIdAndUpdate(userID, payload);
+    async updateUser(userDetails, payload) {
+        // console.log(payload, 'payload');
+        // let addUserMetadataToIPFS = await instanceController.addUserMetadataToIPFS(userDetails.publicAddress, payload);
+        // console.log(addUserMetadataToIPFS, 'addUserMetadataToIPFS')
+        // return
+        // payload = {...payload, userDataHash: addUserMetadataToIPFS};
+        return Model.findByIdAndUpdate(userDetails.id, payload);
     }
 
     async associateUsersToGroup({eoaAddresses, contractAddress, group}) {
-        console.log(eoaAddresses, contractAddress, group, 'eoaAddresses, contractAddress, attribute')
         return await Model.updateMany(
             { publicAddress: { $in: eoaAddresses } },
             { $push: { groups: {contractAddress:contractAddress, name: group} } }
         );
+    }
+
+    async associateFilesToOwner({eoaAddress, contractAddress, fileName}) {
+      return await Model.updateOne(
+          { publicAddress: eoaAddress },
+          { $push: { files: {contractAddress:contractAddress, name: fileName} } }
+      );
+  }
+
+    async findAllUsers({publicAddresses}) {
+        console.log(publicAddresses, 'publicAddress')
+        Model.find({ publicAddress: { $in: publicAddresses } }).toArray((err, result) => {
+            if (err) throw err;
+            console.log(result);
+            client.close();
+        });
     }
 
     // async getFilesAssociatedWithGroups({userPublicAddress, groupContractAddress}) {

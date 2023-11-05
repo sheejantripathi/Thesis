@@ -15,6 +15,10 @@ const userSchema = new mongoose.Schema({
     contractAddress: String,
     name: String,
  }],
+ files: [{
+  contractAddress: String,
+  name: String,
+}],
   publicAddress: {
     type: String,
     required: true,
@@ -23,7 +27,22 @@ const userSchema = new mongoose.Schema({
   },
   username: {
     type: String
-  }
+  },
+  organization: {
+    type: String
+  },
+  country: {
+    type: String
+  },
+  userDataHash: {
+    type: String
+  },
+  publicKey: {
+    type: String
+  },
+  privateKey: {
+    type: String
+  },
 });
 
 module.exports = mongoose.model('User', userSchema);

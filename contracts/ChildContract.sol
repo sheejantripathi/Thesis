@@ -2,70 +2,85 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 contract ChildContract {
-
-    string public userAttribute;
-    address public dataOwnerAddress;
-    string public permissions;
-    uint256 public accessFrom;
-    uint256 public accessTo;
+    struct ContractDetails {
+        string groupName;
+        address groupOwnerAddress;
+        string permissions;
+        string[] organizations;
+        string[] countries;
+    }
 
     struct FileDetails {
         string IPFSHash;
         string name;
     }
 
-    // Mapping to store user EOA addresses to this child contract address
-    mapping(address => bool) public userToContract;
-    // Mapping to store IPFS hashes of the files shared with this contract
-    mapping(string => bool) public sharedIPFSHashes;
-    // Define the storage array to store FileDetails objects
+    address public groupOwner;
+
+    mapping(string => bool) sharedIPFSHashes;
+    mapping(address => bool) userToContract;
     FileDetails[] public addedFileDetails;
+    ContractDetails public contractDetails;
+    struct UserAccess {
+        address eoaAddress;
+        uint accessFrom;
+        uint accessTo;
+        // Add more fields as needed
+    }
+    
+    mapping(address => UserAccess) userToGroupAccess; // User to group access mapping
 
-    event success (string reason);
-
-
+    event Success(string message);
 
     constructor(
-        string memory _userAttribute,
-        address _dataOwnerAddress,
+        string memory _groupName,
+        address _groupOwnerAddress,
         string memory _permissions,
-        uint256 _accessFrom,
-        uint256 _accessTo
+        string[] memory _organizations,
+        string[] memory _countries
     ) {
-        userAttribute = _userAttribute;
-        dataOwnerAddress = _dataOwnerAddress;
-        permissions = _permissions;
-        accessFrom = _accessFrom;
-        accessTo = _accessTo;
+        contractDetails = ContractDetails({
+            groupName: _groupName,
+            groupOwnerAddress: _groupOwnerAddress,
+            permissions: _permissions,
+            organizations: _organizations,
+            countries: _countries
+        });
+
+        groupOwner = msg.sender; // Set the group owner as the contract deployer
     }
 
-    function getContractDetails() public view returns (
-        string memory,
-        address,
-        string memory,
-        uint256,
-        uint256
-    ) {
+     modifier onlyAssociatedUser() {
+        require(userToContract[msg.sender], "User is not allowed to interact with this contract");
+        _;
+    }
+
+    modifier onlyGroupOwner {
+        require(msg.sender == groupOwner, "Only group owner can perform this operation");
+        _;
+    }
+
+    function getChildContractDetails() public view returns (ContractDetails memory) {
+        return contractDetails;
+    }
+
+    function setUserAccess(address eoaAddress, uint accessFrom, uint accessTo) public {
+        userToGroupAccess[eoaAddress] = UserAccess(eoaAddress, accessFrom, accessTo);
+    }
+    
+    function getUserAccess(address eoaAddress) public view returns (uint, uint) {
         return (
-            userAttribute,
-            dataOwnerAddress,
-            permissions,
-            accessFrom,
-            accessTo
+            userToGroupAccess[eoaAddress].accessFrom,
+            userToGroupAccess[eoaAddress].accessTo
         );
     }
 
-    // Function to associate a specific EOA address with this contract
-   
-
-   function associateUsersToGroup(address[] memory userAddresses) public {
-    for (uint256 i = 0; i < userAddresses.length; i++) {
-        address userAddress = userAddresses[i];
-        require(userAddress != address(0), "Invalid user address");
-        userToContract[userAddress] = true;
-        emit success("Transaction successful");
+    function associateUsersToGroup(UserAccess[] calldata users) public onlyGroupOwner {
+        for (uint i = 0; i < users.length; i++) {
+            setUserAccess(users[i].eoaAddress, users[i].accessFrom, users[i].accessTo);
+        }
+        emit Success("Users successfully added to the group");
     }
-   }
 
     function isUserAssociated(address userAddress) public view returns (bool) {
         return userToContract[userAddress];
@@ -79,16 +94,14 @@ contract ChildContract {
             require(!sharedIPFSHashes[IPFSHash], "IPFS hash already shared with this contract");
             sharedIPFSHashes[IPFSHash] = true;
             addedFileDetails.push(fDetail);
-            emit success("Transaction successful");
+            emit Success("Transaction successful");
         }
     }
 
-    // Function to get all IPFS hashes within this contract
     function getAddedFileDetails() public view returns (FileDetails[] memory) {
         return addedFileDetails;
     }
 
-    // Function to check if an IPFS hash is shared
     function isIPFSHashShared(string memory ipfsHash) public view returns (bool) {
         return sharedIPFSHashes[ipfsHash];
     }

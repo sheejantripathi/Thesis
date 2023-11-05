@@ -3,6 +3,8 @@ const Model = require("./policy.model");
 const { Web3 } = require('web3');
 const providers = new Web3.providers.HttpProvider('http://127.00.1:7545');
 let web3 = new Web3(providers);
+
+
 const transactionController = require("../transactions/transactions.controller");
 const userController = require("../users/user.controller");
 const fs = require('fs');
@@ -13,6 +15,7 @@ console.log(PINATA_API_KEY, PINATA_SECRET_API_KEY, 'PINATA_API_KEY, Pinata_SECRE
 // const INFURA_API_KEY = 'd65a7226079f4b9d9da2e1f694dfcda8'
 // const provider = new ethers.BrowserProvider(window.ethereum);
 const instanceController = require('../contractInstances/instances.controller');
+const crypto = require('crypto');
 
 
 // Use the JWT key
@@ -35,38 +38,71 @@ class PolicyController {
   }
 
   async deployAttributeBasedContract(payload) {
-   
-    const { contract_details, asset_owner } = payload;
-    const { groups, filesToBeAssociated } = contract_details;
+    // const network = process.env.ETHEREUM_NETWORK;
+    // let web3 = new Web3(`${process.env.INFURA_API_KEY}`);
+ 
+    const { policies, group_owner } = payload;
+    // console.log(policies, 'policies')
     let transaction_results = [];
+    // const policyInstance = await instanceController.createPolicyContractInstance(); //createPolicyContractInstance is the function that creates the instance of the smart contract
+
     const policyInstance = await instanceController.createPolicyContractInstance(); //createPolicyContractInstance is the function that creates the instance of the smart contract
     
-    let childContractAddress = '';
-    for (let i = 0; i < groups.length; i++) {
-        let fromTimestamp = new Date(groups[i].access_from).getTime() / 1000;
-        let toTimestamp = new Date(groups[i].access_to).getTime() / 1000;
+    for (let i = 0; i < policies.length; i++) {
         try {
             let result = await policyInstance.methods.createChildContract(
-                groups[i].group,
-                asset_owner,
-                groups[i].permissions,
-                fromTimestamp,
-                toTimestamp
-            ).send({ from: asset_owner, gas: 2000000} ) //createChildContract is the function in the smart contract that generates the child contract
+                policies[i].group,
+                group_owner,
+                policies[i].permissions,
+                policies[i].organizations,
+                policies[i].countries,
+            ).send({ from: group_owner, gas: 2000000} ) //createChildContract is the function in the smart contract that generates the child contract
+          
+            console.log(result, 'result after creating a child contract')
+            // Issuing a transaction that calls the `echo` method
+            // const method_abi = policyInstance.methods.createChildContract(
+            //   policies[i].group,
+            //   asset_owner,
+            //   policies[i].permissions,
+            //   fromTimestamp,
+            //   toTimestamp,
+            //   policies[i].organizations,
+            //   policies[i].countries,).encodeABI();
 
+            // const tx = {
+            //   from: asset_owner,
+            //   to: policyInstance.options.address,
+            //   data: method_abi,
+            //   value: '0',
+            //   gasPrice: '1000000000',
+            // };
+            // const gas_estimate = await web3.eth.estimateGas(tx);
+            // tx.gas = gas_estimate;
+            // const signedTx = await web3.eth.accounts.signTransaction(tx, process.env.SIGNER_PRIVATE_KEY);
+            // console.log("Raw transaction data: " + ( signedTx).rawTransaction);
+            // // Sending the transaction to the network
+            // const receipt = await web3.eth
+            //   .sendSignedTransaction(signedTx.rawTransaction)
+            //   .once("transactionHash", (txhash) => {
+            //     console.log(`Mining transaction ...`);
+            //     console.log(`https://${network}.etherscan.io/tx/${txhash}`);
+            //   });
+            // // The transaction is now on chain!
+            // console.log(`Mined in block ${receipt.blockNumber}`);
+            // console.log(result, 'result after creating a child contract')
             //extracts the child contract address and tahe attribute hash from the transaction log
-            const {groupName, contractAddress} = await this.extractChildContractAddress(result);
-            childContractAddress = contractAddress;
+            // const {groupName, contractAddress} = await this.extractChildContractAddress(result);
+            // childContractAddress = contractAddress;
           
             //save the transaction details in the database
             const {policy_detail} = await this.addPolicy(payload);
             
-            let transaction_payload = {...result, group:groups[i].group, policyId:policy_detail._id.toString(),
-              childContractAddress:contractAddress, ownerAddress:asset_owner}; //transaction payload to be stored in the database
-
-              if(filesToBeAssociated.length > 0){
-                await this.addFilesToGroupContract(filesToBeAssociated, childContractAddress, asset_owner);
-              }
+            let transaction_payload = {...result, group:policies[i].group, policyId:policy_detail._id.toString(),
+              childContractAddress:result.to, ownerAddress:group_owner}; //transaction payload to be stored in the database
+/** Indicates the code to associate the files in the smart contract*/
+              // if(filesToBeAssociated.length > 0){
+              //   await this.addFilesToGroupContract(filesToBeAssociated, contractAddress, asset_owner);
+              // }
             const transaction = await transactionController.addTransaction(transaction_payload);
             transaction_results.push(transaction);
 
@@ -84,11 +120,7 @@ class PolicyController {
 
 async addFilesToGroupContract(filesToAddInGroupContract, childContractAddress, userAddress) {
   try {
-    // let ipfsHashes = [];
-    // for (let i = 0; i < filesToAddInGroupContract.length; i++) {
-    //   ipfsHashes.push(filesToAddInGroupContract[i].IPFSHash);
-    // }
-    console.log(filesToAddInGroupContract, 'filesToAddInGroupContract')
+
     const childContractinstance = await instanceController.createChildContractInstance(childContractAddress);
     let receipt = await childContractinstance.methods.addFilesToGroup(
       filesToAddInGroupContract
@@ -186,8 +218,8 @@ async createNode () {
   })
 }
 
-  async heliaFileUploader(fileData) {
-    console.log(fileData, 'fileData')
+  async heliaFileUploader(filesToUpload, asset_owner) {
+    console.log(filesToUpload, 'fileData')
     const { createHelia } = await import('helia')
     const { unixfs } = await import('@helia/unixfs')
     const { MemoryBlockstore } =await import('blockstore-core')
@@ -206,10 +238,31 @@ const fs = unixfs(helia)
 // we will use this TextEncoder to turn strings into Uint8Arrays
 const encoder = new TextEncoder()
 
+let cids = [];
 // add the bytes to your node and receive a unique content identifier
-const cid = await fs.addBytes(encoder.encode(fileData.data))
-console.log('Added file:', cid.toString())
-return cid.toString();
+for (const file of filesToUpload) {
+
+  let options = {
+    pinataMetadata: {
+        name: file.name,
+        keyvalues: {
+            owner: asset_owner,
+            fileSize: file.size
+        }
+    },
+    pinataOptions: {
+        cidVersion: 0
+    }
+};
+  const cid = await fs.addBytes(encoder.encode(file.data))
+  const result = await PinataClient.pinByHash(cid.toString(), options)
+  console.log('Added file:', cid.toString())
+  console.log(result, 'result')
+  cids.push(cid.toString());
+}
+// const cid = await fs.addBytes(encoder.encode(fileData.data))
+// console.log('Added file:', cid.toString())
+// return cid.toString();
 
 
 //     const blockstore = new MemoryBlockstore()
@@ -248,9 +301,28 @@ return cid.toString();
     // console.log('Added file contents:', text)
   }
 
+//   async heliaUploadAndPin() {
+//     import { unixfs } from '@helia/unixfs'
+//     import { Configuration, RemotePinningServiceClient } from '@ipfs-shipyard/pinning-service-client'
+//     import { createHelia } from 'helia'
+//     import { createRemotePinner } from '@helia/remote-pinning'
+
+// const helia = await createHelia()
+// const pinServiceConfig = new Configuration({
+//   endpointUrl: `${endpointUrl}`, // the URI for your pinning provider, e.g. `http://localhost:3000`
+//   accessToken: `${accessToken}` // the secret token/key given to you by your pinning provider
+// })
+
+// const remotePinningClient = new RemotePinningServiceClient(pinServiceConfig)
+// const remotePinner = createRemotePinner(helia, remotePinningClient)
+//   }
+
   async IPFSPinning(fileData) {
    
     const { Readable } = require('stream');
+
+    // const fileStream = fs.createReadStream('path_to_your_file');
+    
     // Assuming fileData is your file object
     const fileBuffer = fileData.data;
 
@@ -261,8 +333,10 @@ return cid.toString();
 
     readableStream.push(fileBuffer);
     readableStream.push(null);
-    let result = await PinataClient.pinFileToIPFS(readableStream)
-    return result; 
+
+    this.encryptStreamAndUploadToIPFS(readableStream);
+    // let result = await PinataClient.pinFileToIPFS(readableStream)
+    // return result; 
   }
 
   async updateIPFSFileMetadata(ipfsPinHash, fileName, groupContractAddress) {
@@ -335,8 +409,19 @@ return cid.toString();
       const childContractinstance = await instanceController.createChildContractInstance(address);
       // console.log(childContractinstance.methods, 'childContractinstance.methods')
       
-      const values = await childContractinstance.methods.getContractDetails().call({ from: ownerDetails.publicAddress});
+      const values = await childContractinstance.methods.getChildContractDetails().call({ from: ownerDetails.publicAddress});
       return values;
+    } catch (error) {
+      console.error('Error fetching contract details:', error);
+    }
+  }
+
+  async getDeployedContractAddresses(ownerAddress) {
+    try {
+      const instance = await instanceController.createPolicyContractInstance();
+      const result = await instance.methods.getDeployedContractAddresses().call({ from: ownerAddress});
+      console.log(result, 'result')
+      return result;
     } catch (error) {
       console.error('Error fetching contract details:', error);
     }
@@ -368,11 +453,23 @@ return cid.toString();
   
   
 async addUsersToGroup(contractDetails, ownerDetails) {
-
-  const childContractinstance = await instanceController.createChildContractInstance(contractDetails.contractAddress); 
+  const {contractAddress, usersListToAdd, groupName} = contractDetails;
+  const childContractinstance = await instanceController.createChildContractInstance(contractAddress); 
+  for(let i = 0; i < usersListToAdd.length; i++){
+    let fromTimestamp = new Date(usersListToAdd[i].accessFrom).getTime() / 1000;
+    let toTimestamp = new Date(usersListToAdd[i].accessTo).getTime() / 1000;
+    usersListToAdd[i].accessFrom = fromTimestamp;
+    usersListToAdd[i].accessTo = toTimestamp;
+  }
+  
+  console.log(usersListToAdd, 'usersListToAdd')
+  return
   let receipt = await childContractinstance.methods.associateUsersToGroup(
-    contractDetails.eoaAddresses
+    usersListToAdd
   ).send({ from: ownerDetails.publicAddress, gas: 1000000} )
+  // let user_details = await userController.findAllUsers({publicAddresses: contractDetails.eoaAddresses});
+  // return
+  
 
   let userUpdated = await userController.associateUsersToGroup(contractDetails);
   // Check the modified document count to ensure successful updates
