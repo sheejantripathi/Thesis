@@ -3,6 +3,9 @@ const router = require("express").Router();
 const Controller = require("./user.controller");
 const authenticateToken = require("../../helpers/utils/jwt-middleware");
 const instanceController = require('../contractInstances/instances.controller');
+const crypto = require('crypto');
+const NodeRSA = require('node-rsa');
+
 
 
 /** GET /api/users */
@@ -32,8 +35,6 @@ router.get('/', async (req, res, next) => {
   });
  
 router.get('/:userId', authenticateToken, async (req, res, next) => {
-    // console.log(req.file, req.files)
-    console.log(req.user);
 
     if (req.user.id !== req.params.userId) {
         return res
@@ -43,7 +44,6 @@ router.get('/:userId', authenticateToken, async (req, res, next) => {
 
     await Controller.getById(req.params.userId)
     .then((user) => {
-        console.log(user, 'user')
         res.json(user)
     })
     .catch(err=>next(err))
@@ -58,16 +58,112 @@ router.post('/', async (req, res, next) => {
 
 /** POST /api/users/asset-upload */
 router.post('/asset-upload',authenticateToken, async (req, res, next) => {
-    if (!req.files) {
-        return res.status(400).send('No files uploaded.');
-      }
-    
-    const asset_owner = req.user.publicAddress
-    const filesToUpload = Object.values(req.files);
-    await instanceController.uploadFileToIPFS(filesToUpload, asset_owner)
-    .then((uploadedFiles) => res.json(uploadedFiles))
-    .catch((err)=> console.log(err));
+  if (!req.files) {
+    return res.status(400).send('No files uploaded.');
+  }
+  
+  const asset_owner = req.user.publicAddress;
+  const filesToUpload = Object.values(req.files);
+  
+  console.log(filesToUpload, 'filesToUpload')
+  return
+  try {
+    const uploadedFiles = await instanceController.encryptStreamAndUploadToIPFS(filesToUpload, asset_owner);
+  
+    for (file of uploadedFiles) {
+      const user = await Controller.findUser({ publicAddress: asset_owner });
+  
+      const encryptedSymmetricKey = crypto.publicEncrypt(
+        {
+          key: user.publicKey,
+          padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+          oaepHash: "sha256",
+        },
+        Buffer.from(file.key)
+      );
+
+      const encryptedSymmetricIV = crypto.publicEncrypt(
+        {
+          key: user.publicKey,
+          padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+          oaepHash: 'sha256',
+        },
+        Buffer.from(file.iv)
+      );
+ 
+      console.log(file, 'file')
+      const factoryContractInstance = await instanceController.createPolicyContractInstance();
+      // console.log(encryptedSymmetricKey, 'encryptedSymmetricKey')
+      // console.log(encryptedSymmetricIV, 'encryptedSymmetricIV')
+
+      // return
+      // Convert hexadecimal strings to bytes
+      const encryptedSymmetricKeyHex = '0x' + encryptedSymmetricKey.toString('hex');
+      const encryptedSymmetricIVHex = '0x' + encryptedSymmetricIV.toString('hex');
+      const fileContractResult = await factoryContractInstance.methods.createFileContract(file.fileName, file.IpfsHash, 
+        encryptedSymmetricKeyHex, encryptedSymmetricIVHex).send({ from: asset_owner, gas: 3000000 });
+  
+      const updatedUser = await Controller.associateFilesToOwner({
+        eoaAddress: asset_owner,
+        contractAddress: fileContractResult.to,
+        fileName: file.name
+      });
+      console.log(updatedUser, 'updatedUser')
+      res.json(updatedUser);
+    }
+  } catch (error) {
+    // Handle any caught errors
+    console.error('Error occurred:', error);
+    return res.status(500).send('Internal Server Error');
+  }
+  
+
+    // const decryptedsymmetricKey = crypto.privateDecrypt(
+      //   {
+      //     key: user.privateKey,
+      //     // In order to decrypt the data, we need to specify the
+      //     // same hashing function and padding scheme that we used to
+      //     // encrypt the data in the previous step
+      //     passphrase: 'top secret',
+      //     padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+      //     oaepHash: "sha256",
+      //   },
+      //   encryptedSymmetricKey
+      // )
+      
+      // The decrypted data is of the Buffer type, which we can convert to a
+      // string to reveal the original data
+      // console.log("decrypted data: ", decryptedsymmetricKey.toString())
+    // .then((uploadedFiles) => res.json(uploadedFiles))
+    // .catch((err)=> console.log(err));
   });
+
+/** POST /api/usere/asset-uplaod-test*/
+
+router.post('/asset-upload-test',authenticateToken, async (req, res, next) => {
+  if (!req.files) {
+      return res.status(400).send('No files uploaded.');
+    }
+  
+  const asset_owner = req.user.publicAddress
+  const filesToUpload = Object.values(req.files);
+  const ipfsUploadResults = await instanceController.uploadFileToIPFS(filesToUpload, asset_owner);
+  const factoryContractInstance = await instanceController.createPolicyContractInstance();
+  let updatedUsersList = [];
+  for (file of ipfsUploadResults) {
+    const fileContractResult = await factoryContractInstance.methods.createFileContract(file.fileName, file.IpfsHash).send({ from: asset_owner, gas: 3000000 });
+  
+    const updatedUser = await Controller.associateFilesToOwner({
+      eoaAddress: asset_owner,
+      contractAddress: fileContractResult.to,
+      fileName: file.name
+    });
+    updatedUsersList.push(updatedUser);
+  }
+
+  res.json(updatedUsersList);
+});
+
 
 /** POST /api/users/asset-download */
 router.post('/asset-download',authenticateToken, async (req, res, next) => {
@@ -88,8 +184,8 @@ router.put('/:userId',authenticateToken, async (req, res, next) => {
             .status(401)
             .send({ error: 'You can can only access yourself' });
     }
-    // console.log(req.params.id)
-    await Controller.updateUser(req.params.userId, req.body)
+    
+    await Controller.updateUser(req.user, req.body)
         .then((user) => {
             if (!user) {
                 console.log('Such user does not exist')
