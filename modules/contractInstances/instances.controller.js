@@ -25,7 +25,7 @@ const childContract = require('../../build/contracts/ChildContract.json');
 async function createPolicyContractInstance() {
     // const web3 = new Web3(
     //     new Web3(`${process.env.INFURA_API_KEY}`)
-    //   );
+    //   );  
     const networkId = await web3.eth.net.getId();
     const deployedNetwork = policyManager.networks[networkId];
     const instance = new web3.eth.Contract(
@@ -57,10 +57,9 @@ async function createPolicyContractInstanceSepolia() {
 }
 
 async function createChildContractInstance(contractAddress) {
-    const networkId = await web3.eth.net.getId();
     const instance = new web3.eth.Contract(
         childContract.abi,
-        contractAddress,
+        contractAddress
     );
     return instance;
 }
@@ -202,8 +201,8 @@ async function getFilesAssociatedWithUser(userAddress) {
 
 async function uploadFileToIPFS(filesToUpload, asset_owner) {
     let filesUploaded = [];
-
-    for (const file of filesToUpload[0]) {
+    console.log(filesToUpload, 'filesToUpload')
+    for (const file of filesToUpload) {
         // Process each file here
         let options = {
             pinataMetadata: {

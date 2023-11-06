@@ -11,24 +11,24 @@ contract ChildContract {
     }
 
     struct FileDetails {
+        string id;
         string IPFSHash;
         string name;
     }
 
-    address public groupOwner;
-
-    mapping(string => bool) sharedIPFSHashes;
-    mapping(address => bool) userToContract;
-    FileDetails[] public addedFileDetails;
-    ContractDetails public contractDetails;
     struct UserAccess {
         address eoaAddress;
         uint accessFrom;
         uint accessTo;
         // Add more fields as needed
     }
-    
-    mapping(address => UserAccess) userToGroupAccess; // User to group access mapping
+
+    mapping(string => bool) sharedIPFSHashes;
+    mapping(address => bool) userToContract;
+    FileDetails[] public addedFileDetails;
+    ContractDetails public contractDetails;
+
+    mapping(address => UserAccess) public userToGroupAccess; // User to group access mapping
 
     event Success(string message);
 
@@ -46,22 +46,10 @@ contract ChildContract {
             organizations: _organizations,
             countries: _countries
         });
-
-        groupOwner = msg.sender; // Set the group owner as the contract deployer
-    }
-
-     modifier onlyAssociatedUser() {
-        require(userToContract[msg.sender], "User is not allowed to interact with this contract");
-        _;
-    }
-
-    modifier onlyGroupOwner {
-        require(msg.sender == groupOwner, "Only group owner can perform this operation");
-        _;
     }
 
     function getChildContractDetails() public view returns (ContractDetails memory) {
-        return contractDetails;
+         return contractDetails;
     }
 
     function setUserAccess(address eoaAddress, uint accessFrom, uint accessTo) public {
@@ -75,15 +63,16 @@ contract ChildContract {
         );
     }
 
-    function associateUsersToGroup(UserAccess[] calldata users) public onlyGroupOwner {
+    function associateUsersToGroup(UserAccess[] calldata users) public {
         for (uint i = 0; i < users.length; i++) {
             setUserAccess(users[i].eoaAddress, users[i].accessFrom, users[i].accessTo);
         }
         emit Success("Users successfully added to the group");
     }
 
-    function isUserAssociated(address userAddress) public view returns (bool) {
-        return userToContract[userAddress];
+   // Function to check if user access is set
+    function isUserAccessSet(address _userAddress) public view returns (bool) {
+        return userToGroupAccess[_userAddress].eoaAddress == _userAddress;
     }
 
     function addFilesToGroup(FileDetails[] memory fileDetails) public {

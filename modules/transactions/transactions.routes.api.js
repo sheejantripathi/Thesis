@@ -12,7 +12,6 @@ router.get('/', authenticateToken, async (req, res) => {
   const ownerAddress = req.user? req.user.publicAddress:'';
     try {
       const result = await Controller.getByOwner(ownerAddress);
-      console.log(result, 'result');
       res.json(result);
     } catch (error) {
       console.error(error);

@@ -20,10 +20,6 @@ contract PolicyManager {
     event ChildContractCreated(string indexed group, address childContract);
     event Success(string message);
 
-    constructor() {
-        owner = msg.sender;
-    }
-
     //code to generate a new File contract
     event FileContractCreated(address indexed fileContractAddress, address indexed owner);
 
@@ -42,7 +38,6 @@ contract PolicyManager {
         string[] memory _countries
     ) external {
         require(_groupOwnerAddress != address(0), "Invalid data owner address");
-        require(_groupOwnerAddress == owner, "Only owner can invoke the child contract creation");
         require(!groupToContractExists[_groupName][_permissions], "Policy Contract already exists for this group, specific to this asset");
 
         ChildContract childContract = new ChildContract(
@@ -60,6 +55,7 @@ contract PolicyManager {
     }
 
     function getDeployedContractAddresses() public view returns (ChildContract[] memory) {
+        // emit Debug("Inside getChildContractDetails"); // Add this line for debugging
         return policies;
     }
 
