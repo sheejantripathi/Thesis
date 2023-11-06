@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const Model = require("./user.model");
 const instanceController = require('../contractInstances/instances.controller');
 const NodeRSA = require('node-rsa');
+const c = require("config");
 
 class UserController {
     async findUser(payload) {
@@ -72,9 +73,13 @@ class UserController {
         return Model.findByIdAndUpdate(userDetails.id, payload);
     }
 
-    async associateUsersToGroup({eoaAddresses, contractAddress, group}) {
-        return await Model.updateMany(
-            { publicAddress: { $in: eoaAddresses } },
+    async associateUsersToGroup(usersListToAdd, contractAddress, group) {
+      let eoaAddressesToAdd = [];
+      for(const user of usersListToAdd){
+        eoaAddressesToAdd.push(user.eoaAddress);
+      }
+      return await Model.updateMany(
+            { publicAddress: { $in: eoaAddressesToAdd } },
             { $push: { groups: {contractAddress:contractAddress, name: group} } }
         );
     }

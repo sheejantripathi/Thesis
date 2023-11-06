@@ -21,7 +21,7 @@ router.get('/', async (req, res, next) => {
     // console.log(req.file, req.files)
     const whereClause = req.user && req.user.publicAddress ? { publicAddress: req.user.publicAddress }: undefined;
     // const childContractInstance = await instanceController.createChildContractInstance(groupContractAddress);
-	await Controller.findUser(whereClause)
+	  await Controller.findUser(whereClause)
 		.then((users) => res.json(users))
 		.catch(next);
   });
@@ -210,7 +210,7 @@ router.put('/:userId',authenticateToken, async (req, res, next) => {
     const userPublicAddress = req.user && req.user.publicAddress ? req.user.publicAddress : '';
     const groupContractAddress = req.query ? req.query.groupContractAddress: '';
     const childContractInstance = await instanceController.createChildContractInstance(groupContractAddress);
-    const isUserAssociatedWithContract = await childContractInstance.methods.isUserAssociated(userPublicAddress).call();
+    const isUserAssociatedWithContract = await childContractInstance.methods.isUserAccessSet(userPublicAddress).call();
     console.log(isUserAssociatedWithContract, 'isUser')
     if (isUserAssociatedWithContract !== true) {
         return res

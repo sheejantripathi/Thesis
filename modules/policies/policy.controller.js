@@ -17,7 +17,7 @@ console.log(PINATA_API_KEY, PINATA_SECRET_API_KEY, 'PINATA_API_KEY, Pinata_SECRE
 const instanceController = require('../contractInstances/instances.controller');
 const crypto = require('crypto');
 
-
+const childContract = require('../../build/contracts/ChildContract.json');
 // Use the JWT key
 const pinataSDK = require('@pinata/sdk');
 const PinataClient = new pinataSDK(PINATA_API_KEY, PINATA_SECRET_API_KEY);
@@ -38,16 +38,13 @@ class PolicyController {
   }
 
   async deployAttributeBasedContract(payload) {
-    // const network = process.env.ETHEREUM_NETWORK;
-    // let web3 = new Web3(`${process.env.INFURA_API_KEY}`);
+    const network = process.env.ETHEREUM_NETWORK;
+    let web3 = new Web3(`${process.env.INFURA_API_KEY}`);
  
     const { policies, group_owner } = payload;
-    // console.log(policies, 'policies')
     let transaction_results = [];
-    // const policyInstance = await instanceController.createPolicyContractInstance(); //createPolicyContractInstance is the function that creates the instance of the smart contract
-
+    // const policyInstance = await instanceController.createPolicyContractInstanceSepolia(); //createPolicyContractInstance is the function that creates the instance of the smart contract
     const policyInstance = await instanceController.createPolicyContractInstance(); //createPolicyContractInstance is the function that creates the instance of the smart contract
-    
     for (let i = 0; i < policies.length; i++) {
         try {
             let result = await policyInstance.methods.createChildContract(
@@ -59,18 +56,16 @@ class PolicyController {
             ).send({ from: group_owner, gas: 2000000} ) //createChildContract is the function in the smart contract that generates the child contract
           
             console.log(result, 'result after creating a child contract')
-            // Issuing a transaction that calls the `echo` method
+            // // Issuing a transaction that calls the `echo` method
             // const method_abi = policyInstance.methods.createChildContract(
             //   policies[i].group,
-            //   asset_owner,
+            //   group_owner,
             //   policies[i].permissions,
-            //   fromTimestamp,
-            //   toTimestamp,
-            //   policies[i].organizations,
-            //   policies[i].countries,).encodeABI();
+            //   policies[i].organizations[0],
+            //   policies[i].countries[0]).encodeABI();
 
             // const tx = {
-            //   from: asset_owner,
+            //   from: group_owner,
             //   to: policyInstance.options.address,
             //   data: method_abi,
             //   value: '0',
@@ -89,16 +84,17 @@ class PolicyController {
             //   });
             // // The transaction is now on chain!
             // console.log(`Mined in block ${receipt.blockNumber}`);
-            // console.log(result, 'result after creating a child contract')
-            //extracts the child contract address and tahe attribute hash from the transaction log
-            // const {groupName, contractAddress} = await this.extractChildContractAddress(result);
+            // console.log(receipt, 'result after creating a child contract')
+            // return
+            // extracts the child contract address and tahe attribute hash from the transaction log
+            const {groupName, contractAddress} = await this.extractChildContractAddress(result);
             // childContractAddress = contractAddress;
           
             //save the transaction details in the database
             const {policy_detail} = await this.addPolicy(payload);
             
             let transaction_payload = {...result, group:policies[i].group, policyId:policy_detail._id.toString(),
-              childContractAddress:result.to, ownerAddress:group_owner}; //transaction payload to be stored in the database
+              childContractAddress:contractAddress, ownerAddress:group_owner}; //transaction payload to be stored in the database
 /** Indicates the code to associate the files in the smart contract*/
               // if(filesToBeAssociated.length > 0){
               //   await this.addFilesToGroupContract(filesToBeAssociated, contractAddress, asset_owner);
@@ -404,12 +400,10 @@ for (const file of filesToUpload) {
     }
   }
 
-  async fetchContractDetails(address, ownerDetails) {
+  async fetchContractDetails(childContractAddress, ownerDetails) {
     try {
-      const childContractinstance = await instanceController.createChildContractInstance(address);
-      // console.log(childContractinstance.methods, 'childContractinstance.methods')
-      
-      const values = await childContractinstance.methods.getChildContractDetails().call({ from: ownerDetails.publicAddress});
+      const childContractinstance = await instanceController.createChildContractInstance(childContractAddress);  
+      const values = await childContractinstance.methods.getChildContractDetails().call();
       return values;
     } catch (error) {
       console.error('Error fetching contract details:', error);
@@ -453,7 +447,8 @@ for (const file of filesToUpload) {
   
   
 async addUsersToGroup(contractDetails, ownerDetails) {
-  const {contractAddress, usersListToAdd, groupName} = contractDetails;
+  const {contractAddress, usersListToAdd, filesToAdd, groupName} = contractDetails;
+  
   const childContractinstance = await instanceController.createChildContractInstance(contractAddress); 
   for(let i = 0; i < usersListToAdd.length; i++){
     let fromTimestamp = new Date(usersListToAdd[i].accessFrom).getTime() / 1000;
@@ -462,23 +457,23 @@ async addUsersToGroup(contractDetails, ownerDetails) {
     usersListToAdd[i].accessTo = toTimestamp;
   }
   
-  console.log(usersListToAdd, 'usersListToAdd')
-  return
+  let filesAssociatedTOGroup = await childContractinstance.methods.addFilesToGroup(filesToAdd)
+  .send({ from: ownerDetails.publicAddress, gas: 1000000} )
+  
   let receipt = await childContractinstance.methods.associateUsersToGroup(
     usersListToAdd
   ).send({ from: ownerDetails.publicAddress, gas: 1000000} )
   // let user_details = await userController.findAllUsers({publicAddresses: contractDetails.eoaAddresses});
   // return
-  
 
-  let userUpdated = await userController.associateUsersToGroup(contractDetails);
+  let userUpdated = await userController.associateUsersToGroup(usersListToAdd, contractAddress, groupName);
   // Check the modified document count to ensure successful updates
   if (userUpdated.nModified > 0) {
-    return "Users successfully assigned to the group";
+    return {message:"Users successfully assigned to the group", userUpdated};
 } else {
-    return "No users were assigned to the group";
+    return {message:"No users were assigned to the group"};
 }
-  // return receipt
+  
 }
 
   newPolicy(payload) {

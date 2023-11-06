@@ -31,18 +31,11 @@ router.get('/get-contract-details', authenticateToken, async (req, res, next) =>
   try {
     const childContractAddress = req.query? req.query.childContractAddress:'';
     const fetched_contract_details = await Controller.fetchContractDetails(childContractAddress, req.user);
-    const accessFrom = Number(fetched_contract_details.accessFrom); // Convert to a regular number
-    const accessTo = Number(fetched_contract_details.accessTo); // Convert to a regular number
-
-    const accessFromTimestamp = new Date(accessFrom * 1000).toDateString();
-    const accessToTimestamp = new Date(accessTo * 1000).toDateString(); // Convert from seconds to milliseconds
-
+    console.log(fetched_contract_details, 'fetched_contract_details');
     const contract_details = {
       groupName: fetched_contract_details.groupName,
       permissions: fetched_contract_details.permissions,
-      accessFrom: accessFromTimestamp,
-      accessTo: accessToTimestamp,
-      ownerAddress: fetched_contract_details.assetOwnerAddress,
+      ownerAddress: fetched_contract_details.groupOwnerAddress,
       contractAddress: childContractAddress,
       countries: fetched_contract_details.countries,
       organizations: fetched_contract_details.organizations,
@@ -53,14 +46,14 @@ router.get('/get-contract-details', authenticateToken, async (req, res, next) =>
   }
 });
 
-router.get('/get-contract-list', authenticateToken, async (req, res, next) => { 
-  try {
-    // const childContractAddress = req.query? req.query.childContractAddress:'';
-    await Controller.getDeployedContractAddresses(req.user.publicAddress);
-  } catch (error) {
-    next(error);
-  }
-});
+// router.get('/get-contract-list', authenticateToken, async (req, res, next) => { 
+//   try {
+//     // const childContractAddress = req.query? req.query.childContractAddress:'';
+//     await Controller.getDeployedContractAddresses(req.user.publicAddress);
+//   } catch (error) {
+//     next(error);
+//   }
+// });
 
 
 router.get('/get-access', authenticateToken, async (req, res, next) => { 
