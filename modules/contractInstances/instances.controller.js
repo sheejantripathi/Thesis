@@ -16,7 +16,10 @@ const Controller = require('../users/user.controller');
 // const provider = new ethers.BrowserProvider(window.ethereum);
 
 const policyManager = require('../../build/contracts/PolicyManager.json');
-const childContract = require('../../build/contracts/ChildContract.json');
+const groupcontract = require('../../build/contracts/GroupContract.json');
+const userMetadataFactory = require('../../build/contracts/UserMetadataFactory.json');
+const userMetadata = require('../../build/contracts/UserMetadata.json');
+
 
 // const {encryptFile} = require('./ipfs-encrypt');
 
@@ -58,10 +61,28 @@ async function createPolicyContractInstanceSepolia() {
 
 async function createChildContractInstance(contractAddress) {
     const instance = new web3.eth.Contract(
-        childContract.abi,
+        groupcontract.abi,
         contractAddress
     );
     return instance;
+}
+
+async function createUserFactoryContractInstance() {
+  const networkId = await web3.eth.net.getId();
+  const deployedNetwork = userMetadataFactory.networks[networkId];
+  const instance = new web3.eth.Contract(
+      userMetadataFactory.abi,
+      deployedNetwork && deployedNetwork.address,
+  );
+  return instance;
+}
+
+async function createUserMetadataInstance(contractAddress) {
+  const instance = new web3.eth.Contract(
+    userMetadata.abi,
+      contractAddress
+  );
+  return instance;
 }
 
 async function encryptFile(file) {
@@ -180,8 +201,8 @@ async function getFilesAssociatedWithGroups(groupAddress) {
 }
 
 async function getFilesAssociatedWithUser(userAddress) {
-    // console.log(userAddress, 'userAddress')
-    // const user = await Controller.findUser({publicAddress: asset_owner});
+
+    // const user = await Controller.findUser({publicAddress: userAddress});
     let metadataFilter = {
         keyvalues: {
             owner: {
@@ -197,13 +218,26 @@ async function getFilesAssociatedWithUser(userAddress) {
         };
     const data = await PinataClient.pinList(filters);
     return data; 
+    
+    // return data; 
+}
+
+async function getuserGroupDetials(userAddress) {
+    const userMetadataFactoryInstance = await createUserFactoryContractInstance();
+    const userContractAddress = await userMetadataFactoryInstance.methods.getUserContractAddress().call({ from: userAddress});
+    const userMetadataInstance = await createUserMetadataInstance(userContractAddress);
+
+    const usersGroupInfo = await userMetadataInstance.methods.getUserGroupInfo(userAddress).call({ from: userAddress, gas: 3000000}); 
+    return usersGroupInfo;
+    
 }
 
 async function uploadFileToIPFS(filesToUpload, asset_owner) {
     let filesUploaded = [];
-    console.log(filesToUpload, 'filesToUpload')
+ 
     for (const file of filesToUpload) {
         // Process each file here
+
         let options = {
             pinataMetadata: {
                 name: file.name,
@@ -226,11 +260,30 @@ async function uploadFileToIPFS(filesToUpload, asset_owner) {
         readableStream.push(fileBuffer);
         readableStream.push(null);
         let result = await PinataClient.pinFileToIPFS(readableStream, options)
-        result = {...result, fileName:file.name}
+        result = {...result, name:file.name}
         filesUploaded.push(result);
       }
-   
-    return filesUploaded; 
+
+    const userMetadataFactoryInstance = await createUserFactoryContractInstance();
+    const userContractAddress = await userMetadataFactoryInstance.methods.getUserContractAddress().call({ from: asset_owner});
+
+    const userMetadataInstance = await createUserMetadataInstance(userContractAddress);
+
+    const filesWithoutPinSize = filesUploaded.map(({ PinSize, ...rest }) => rest);
+
+    const usersFilesDetailsStored = await userMetadataInstance.methods.uploadFiles(filesWithoutPinSize).send({ from: asset_owner, gas: 3000000 }); 
+    return usersFilesDetailsStored; 
+}
+
+async function addGroupsToUserContract(groupContractAddress, groupName, usersListToAdd) {
+  const userMetadataFactoryInstance = await createUserFactoryContractInstance();
+  for(const user of usersListToAdd){
+    const userContractAddress = await userMetadataFactoryInstance.methods.getUserContractAddress().call({ from: user.eoaAddress});
+    const userMetadataInstance = await createUserMetadataInstance(userContractAddress);
+    const groupsAddeddToUserContract = await userMetadataInstance.methods.associateToGroup(groupName, groupContractAddress).send({ from: user.eoaAddress, gas: 3000000 }); 
+  }
+ 
+  return usersListToAdd; 
 }
 
 async function updateIPFSFileMetadata(ipfsPinHash, contractAddress, contractName) {
@@ -250,8 +303,12 @@ async function updateIPFSFileMetadata(ipfsPinHash, contractAddress, contractName
 module.exports = {
     createPolicyContractInstance, 
     createChildContractInstance, 
+    createUserFactoryContractInstance,
+    createUserMetadataInstance,
+    addGroupsToUserContract,
     getFilesAssociatedWithGroups, 
     uploadFileToIPFS,
+    getuserGroupDetials,
     getFilesAssociatedWithUser,
     updateIPFSFileMetadata,
     encryptStreamAndUploadToIPFS,
