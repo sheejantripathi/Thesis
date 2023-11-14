@@ -17,7 +17,6 @@ console.log(PINATA_API_KEY, PINATA_SECRET_API_KEY, 'PINATA_API_KEY, Pinata_SECRE
 const instanceController = require('../contractInstances/instances.controller');
 const crypto = require('crypto');
 
-const childContract = require('../../build/contracts/ChildContract.json');
 // Use the JWT key
 const pinataSDK = require('@pinata/sdk');
 const PinataClient = new pinataSDK(PINATA_API_KEY, PINATA_SECRET_API_KEY);
@@ -47,13 +46,12 @@ class PolicyController {
     const policyInstance = await instanceController.createPolicyContractInstance(); //createPolicyContractInstance is the function that creates the instance of the smart contract
     for (let i = 0; i < policies.length; i++) {
         try {
-            let result = await policyInstance.methods.createChildContract(
+            let result = await policyInstance.methods.createGroupContract(
                 policies[i].group,
-                group_owner,
                 policies[i].permissions,
                 policies[i].organizations,
                 policies[i].countries,
-            ).send({ from: group_owner, gas: 2000000} ) //createChildContract is the function in the smart contract that generates the child contract
+            ).send({ from: group_owner, gas: 3000000} ) //createChildContract is the function in the smart contract that generates the child contract
           
             console.log(result, 'result after creating a child contract')
             // // Issuing a transaction that calls the `echo` method
@@ -91,7 +89,7 @@ class PolicyController {
             // childContractAddress = contractAddress;
           
             //save the transaction details in the database
-            const {policy_detail} = await this.addPolicy(payload);
+            const policy_detail = await this.addPolicy(payload);
             
             let transaction_payload = {...result, group:policies[i].group, policyId:policy_detail._id.toString(),
               childContractAddress:contractAddress, ownerAddress:group_owner}; //transaction payload to be stored in the database
@@ -101,17 +99,17 @@ class PolicyController {
               // }
             const transaction = await transactionController.addTransaction(transaction_payload);
             transaction_results.push(transaction);
-
+              console.log(transaction_results, 'transaction_results')
         } catch (error) {
             console.log('Error processing transaction:', error.message);
             // Handle error if needed
             // You can choose to rethrow the error or return a specific message indicating failure
-            return { success: false, error: 'Error processing transaction' };
+            return { success: false, message: 'Error processing transaction' };
         }
     }
     // Return a success message once all transactions have been successfully processed
     // let addFilesToGroupContract = await this.addFilesToGroupContract(filesToAddInGroupContract, childContractAddress);
-    return { success: true, message: 'Transactions completed successfully', transactionReceipts: transaction_results};
+    return { success: true, message: 'Group Smart contract deployed successfully', transactionReceipts: transaction_results};
 }
 
 async addFilesToGroupContract(filesToAddInGroupContract, childContractAddress, userAddress) {
@@ -392,7 +390,7 @@ for (const file of filesToUpload) {
       // let asset_detail = await AssetModel.create(assetPayload);
       // payload.assetId = asset_detail._id;
       let policy_detail = await Model.create(payload);
-      return {policy_detail};
+      return policy_detail;
     } catch (error) {
       // Handle errors appropriately
       console.error('Error adding policy:', error);
@@ -400,10 +398,10 @@ for (const file of filesToUpload) {
     }
   }
 
-  async fetchContractDetails(childContractAddress, ownerDetails) {
+  async fetchContractDetails(childContractAddress, ownerAddress) {
     try {
       const childContractinstance = await instanceController.createChildContractInstance(childContractAddress);  
-      const values = await childContractinstance.methods.getChildContractDetails().call();
+      const values = await childContractinstance.methods.getContractDetails().call({ from: ownerAddress});
       return values;
     } catch (error) {
       console.error('Error fetching contract details:', error);
@@ -446,23 +444,24 @@ for (const file of filesToUpload) {
   }
   
   
-async addUsersToGroup(contractDetails, ownerDetails) {
+async addUsersToGroup(contractDetails, userAddress) {
   const {contractAddress, usersListToAdd, filesToAdd, groupName} = contractDetails;
+  await instanceController.addGroupsToUserContract(contractAddress, groupName, usersListToAdd); 
   
   const childContractinstance = await instanceController.createChildContractInstance(contractAddress); 
+
   for(let i = 0; i < usersListToAdd.length; i++){
     let fromTimestamp = new Date(usersListToAdd[i].accessFrom).getTime() / 1000;
     let toTimestamp = new Date(usersListToAdd[i].accessTo).getTime() / 1000;
     usersListToAdd[i].accessFrom = fromTimestamp;
     usersListToAdd[i].accessTo = toTimestamp;
   }
-  
+ 
   let filesAssociatedTOGroup = await childContractinstance.methods.addFilesToGroup(filesToAdd)
-  .send({ from: ownerDetails.publicAddress, gas: 1000000} )
-  
-  let receipt = await childContractinstance.methods.associateUsersToGroup(
-    usersListToAdd
-  ).send({ from: ownerDetails.publicAddress, gas: 1000000} )
+  .send({ from: userAddress, gas: 2000000} )
+
+  let receipt = await childContractinstance.methods.associateUsersToGroup(usersListToAdd)
+  .send({ from: userAddress, gas: 2000000} )
   // let user_details = await userController.findAllUsers({publicAddresses: contractDetails.eoaAddresses});
   // return
 

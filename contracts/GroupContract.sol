@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.7.0 <0.9.0;
 
-contract ChildContract {
+contract GroupContract {
     struct ContractDetails {
         string groupName;
         address groupOwnerAddress;
@@ -11,24 +11,28 @@ contract ChildContract {
     }
 
     struct FileDetails {
-        string id;
         string IPFSHash;
         string name;
     }
 
     struct UserAccess {
+        uint accessFrom;
+        uint accessTo;
+        bool isAuthorized;
+    }
+
+    struct UserInput {
         address eoaAddress;
         uint accessFrom;
         uint accessTo;
-        // Add more fields as needed
     }
 
+    mapping(address => UserAccess) public userToGroupAccess; // User to group access mapping
+
     mapping(string => bool) sharedIPFSHashes;
-    mapping(address => bool) userToContract;
     FileDetails[] public addedFileDetails;
     ContractDetails public contractDetails;
 
-    mapping(address => UserAccess) public userToGroupAccess; // User to group access mapping
 
     event Success(string message);
 
@@ -48,22 +52,37 @@ contract ChildContract {
         });
     }
 
-    function getChildContractDetails() public view returns (ContractDetails memory) {
+    modifier onlyGroupOwner() {
+        require(msg.sender == contractDetails.groupOwnerAddress, "Only group owner can call this function");
+        _;
+    }
+
+    modifier onlyGroupMembers() {
+        require(msg.sender == contractDetails.groupOwnerAddress, "Only group owner can call this function");
+        _;
+    }
+
+    function getContractDetails() public view returns (ContractDetails memory) {
          return contractDetails;
     }
 
-    function setUserAccess(address eoaAddress, uint accessFrom, uint accessTo) public {
-        userToGroupAccess[eoaAddress] = UserAccess(eoaAddress, accessFrom, accessTo);
+    function setUserAccess(address eoaAddress, uint accessFrom, uint accessTo) public onlyGroupOwner {
+        userToGroupAccess[eoaAddress] = UserAccess(accessFrom, accessTo, true);
+    }
+
+    function removeUserAccess(address eoaAddress) public onlyGroupOwner {
+        delete userToGroupAccess[eoaAddress];
     }
     
-    function getUserAccess(address eoaAddress) public view returns (uint, uint) {
+    function getUserAccessInfo(address _userAddress) public view returns (uint, uint, bool) {
         return (
-            userToGroupAccess[eoaAddress].accessFrom,
-            userToGroupAccess[eoaAddress].accessTo
+            userToGroupAccess[_userAddress].accessFrom,
+            userToGroupAccess[_userAddress].accessTo,
+            userToGroupAccess[_userAddress].isAuthorized
         );
     }
 
-    function associateUsersToGroup(UserAccess[] calldata users) public {
+    function associateUsersToGroup(UserInput[] memory users) public onlyGroupOwner{
         for (uint i = 0; i < users.length; i++) {
             setUserAccess(users[i].eoaAddress, users[i].accessFrom, users[i].accessTo);
         }
@@ -72,18 +91,17 @@ contract ChildContract {
 
    // Function to check if user access is set
     function isUserAccessSet(address _userAddress) public view returns (bool) {
-        return userToGroupAccess[_userAddress].eoaAddress == _userAddress;
+        return userToGroupAccess[_userAddress].isAuthorized == true;
     }
 
     function addFilesToGroup(FileDetails[] memory fileDetails) public {
         for (uint256 i = 0; i < fileDetails.length; i++) {
             FileDetails memory fDetail = fileDetails[i];
             string memory IPFSHash = fDetail.IPFSHash;
-            require(bytes(IPFSHash).length > 0, "Invalid IPFS hash");
-            require(!sharedIPFSHashes[IPFSHash], "IPFS hash already shared with this contract");
+            // require(sharedIPFSHashes[IPFSHash], "IPFS hash already shared with this contract");
             sharedIPFSHashes[IPFSHash] = true;
             addedFileDetails.push(fDetail);
-            emit Success("Transaction successful");
+            emit Success("Files successfullly shared in the group");
         }
     }
 

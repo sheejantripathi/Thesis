@@ -21,9 +21,17 @@ router.get('/', async (req, res, next) => {
     // console.log(req.file, req.files)
     const whereClause = req.user && req.user.publicAddress ? { publicAddress: req.user.publicAddress }: undefined;
     // const childContractInstance = await instanceController.createChildContractInstance(groupContractAddress);
-	  await Controller.findUser(whereClause)
-		.then((users) => res.json(users))
-		.catch(next);
+    const groupDetailsOfUser = await instanceController.getuserGroupDetials(req.user.publicAddress);
+    const transformedData = groupDetailsOfUser.map(group => {
+      return {
+        name: group.groupName,
+        contractAddress: group.groupContractAddress
+      };
+    });
+    res.json(transformedData)
+	  // await Controller.findUser(whereClause)
+		// .then((users) => res.json(users))
+		// .catch(next);
   });
 
   router.get('/uploadedFiles', authenticateToken, async (req, res, next) => {
@@ -146,22 +154,25 @@ router.post('/asset-upload-test',authenticateToken, async (req, res, next) => {
     }
   
   const asset_owner = req.user.publicAddress
-  const filesToUpload = Object.values(req.files);
-  const ipfsUploadResults = await instanceController.uploadFileToIPFS(filesToUpload, asset_owner);
-  const factoryContractInstance = await instanceController.createPolicyContractInstance();
-  let updatedUsersList = [];
-  for (file of ipfsUploadResults) {
-    const fileContractResult = await factoryContractInstance.methods.createFileContract(file.fileName, file.IpfsHash).send({ from: asset_owner, gas: 3000000 });
-  
-    const updatedUser = await Controller.associateFilesToOwner({
-      eoaAddress: asset_owner,
-      contractAddress: fileContractResult.to,
-      fileName: file.name
-    });
-    updatedUsersList.push(updatedUser);
-  }
 
-  res.json(updatedUsersList);
+  const filesToUpload = [].concat(...Object.values(req.files));
+
+  await instanceController.uploadFileToIPFS(filesToUpload, asset_owner);
+  res.json({message: 'Files successfully uploaded to IPFS', success: true});
+  // const factoryContractInstance = await instanceController.createPolicyContractInstance();
+  // let updatedUsersList = [];
+  // for (file of ipfsUploadResults) {
+  //   const fileContractResult = await factoryContractInstance.methods.createFileContract(file.fileName, file.IpfsHash).send({ from: asset_owner, gas: 3000000 });
+  
+  //   const updatedUser = await Controller.associateFilesToOwner({
+  //     eoaAddress: asset_owner,
+  //     contractAddress: fileContractResult.to,
+  //     fileName: file.name
+  //   });
+  //   updatedUsersList.push(updatedUser);
+  // }
+
+  // res.json(updatedUsersList);
 });
 
 
@@ -205,30 +216,41 @@ router.put('/:userId',authenticateToken, async (req, res, next) => {
   });
 
   router.get('/group/files', authenticateToken, async (req, res, next) => {
-    // console.log(req.file, req.files)
-    console.log(req.user, 'req.user');
     const userPublicAddress = req.user && req.user.publicAddress ? req.user.publicAddress : '';
     const groupContractAddress = req.query ? req.query.groupContractAddress: '';
     const childContractInstance = await instanceController.createChildContractInstance(groupContractAddress);
-    const isUserAssociatedWithContract = await childContractInstance.methods.isUserAccessSet(userPublicAddress).call();
-    console.log(isUserAssociatedWithContract, 'isUser')
-    if (isUserAssociatedWithContract !== true) {
-        return res
-            .status(401)
-            .send({ error: 'User is not associated with the group' });
-    }
-    else{
-        const filesInGroup = await childContractInstance.methods.getAddedFileDetails().call();
+    const isUserAssociatedWithContract = await childContractInstance.methods.getUserAccessInfo(userPublicAddress).call();
+    const currentTime = Math.floor(Date.now() / 1000); // Get current Unix timestamp
+
+    console.log(isUserAssociatedWithContract, 'isUserAssociatedWithContract')
+    // Assuming you have received accessFrom and accessTo timestamps from the smart contract
+    const userAccessFrom = isUserAssociatedWithContract['0'];
+    const userAccessTo = isUserAssociatedWithContract['1'];
+    
+    if(isUserAssociatedWithContract['2'] === true && (currentTime>=userAccessFrom && currentTime<=userAccessTo)){
+      const filesInGroup = await childContractInstance.methods.getAddedFileDetails().call();
         const formattedData = filesInGroup.map((item) => {
             return {
               IPFSHash: item[0],
               name: item[1],
             };
           });
-          console.log(formattedData, 'formattedData')
-        res.json(formattedData);
+        res.json({formattedData:formattedData, message: 'Files successfully fetched from the group'});
+    }
+    else{
+      return res
+      .status(401)
+      .send({ message: 'User is not authorized to access the group' });
     }
   });
 
-
+/** GET /api/users/get-metadata */
+router.get('/metadata-details',authenticateToken, async (req, res, next) => {
+  
+  console.log(req.query, 'req.query')
+  return
+  await instanceController.downloadFileFromIPFS(filesToUpload, asset_owner)
+  .then((uploadedFiles) => res.json(uploadedFiles))
+  .catch((err)=> console.log(err));
+});
   module.exports = router;

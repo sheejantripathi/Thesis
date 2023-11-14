@@ -20,8 +20,9 @@ router.post('/add', authenticateToken, async (req, res, next) => {
       group_owner: req.user.publicAddress
     };
 
-    let deployedContractResults = await policyController.deployAttributeBasedContract(payload);
-    res.send({message: 'Policy added Successfully', success: true});
+    await policyController.deployAttributeBasedContract(payload);
+    
+    res.send({success:true, message: "Policy successfully added"})
   } catch (error) {
     next(error);
   }
@@ -30,8 +31,7 @@ router.post('/add', authenticateToken, async (req, res, next) => {
 router.get('/get-contract-details', authenticateToken, async (req, res, next) => { 
   try {
     const childContractAddress = req.query? req.query.childContractAddress:'';
-    const fetched_contract_details = await Controller.fetchContractDetails(childContractAddress, req.user);
-    console.log(fetched_contract_details, 'fetched_contract_details');
+    const fetched_contract_details = await Controller.fetchContractDetails(childContractAddress, req.user.publicAddress);
     const contract_details = {
       groupName: fetched_contract_details.groupName,
       permissions: fetched_contract_details.permissions,
@@ -76,9 +76,10 @@ router.post('/add-users-to-group', authenticateToken, async (req, res, next) => 
       user_contract_details: JSON.parse(req.body.user_contract_details),
     };
 
-    const user_assigned_to_child_contract = await policyController.addUsersToGroup(payload.user_contract_details, req.user);
+    const user_assigned_to_child_contract = await policyController.addUsersToGroup(payload.user_contract_details, req.user.publicAddress);
+
     // console.log(user_assigned_to_child_contract, 'user_assigned_to_child_contract');
-    res.send("Users successfully assigned to the group")
+    res.send({success:true, message: "Users successfully added to the group"})
     // res.json(registerUserDetails);
   } catch (error) {
     next(error);

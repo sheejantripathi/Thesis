@@ -1,13 +1,10 @@
-const mongoose = require("mongoose");
-
 const Model = require("./user.model");
 const instanceController = require('../contractInstances/instances.controller');
-const NodeRSA = require('node-rsa');
-const c = require("config");
+
 
 class UserController {
     async findUser(payload) {
-      console.log(payload, 'payload')
+  
         let result = await Model.findOne(payload);
         return result ? result : '';
     }
@@ -22,42 +19,8 @@ class UserController {
     }
 
     async addUser(payload) {
-        const { generateKeyPair } = require('crypto');
-
         try {
-            const generateKeyPairAsync = () => {
-              return new Promise((resolve, reject) => {
-                generateKeyPair(
-                  'rsa',
-                  {
-                    modulusLength: 4096,
-                    publicKeyEncoding: {
-                      type: 'spki',
-                      format: 'pem',
-                    },
-                    privateKeyEncoding: {
-                      type: 'pkcs8',
-                      format: 'pem',
-                      cipher: 'aes-256-cbc',
-                      passphrase: 'top secret',
-                    },
-                  },
-                  (err, publicKey, privateKey) => {
-                    if (err) {
-                      reject(err);
-                    } else {
-                      resolve({ publicKey, privateKey });
-                    }
-                  }
-                );
-              });
-            };
-        
-            // Wait for the key pair generation to complete
-            const { publicKey, privateKey } = await generateKeyPairAsync();
-        
-            const payloadWithKeys = {...payload, publicKey, privateKey };
-            const createdModel = await Model.create(payloadWithKeys);
+            const createdModel = await Model.create(payload);
             return createdModel;
           } catch (error) {
             console.error('Error:', error);
@@ -65,12 +28,16 @@ class UserController {
     }
 
     async updateUser(userDetails, payload) {
-        // console.log(payload, 'payload');
-        // let addUserMetadataToIPFS = await instanceController.addUserMetadataToIPFS(userDetails.publicAddress, payload);
-        // console.log(addUserMetadataToIPFS, 'addUserMetadataToIPFS')
-        // return
+        const {organization, country, username} = payload;
+      
+        let userContractInstance = await instanceController.createUserFactoryContractInstance();
+        const userRegistered = await userContractInstance.methods.createUserContract(organization, country)
+        .send({ from: userDetails.publicAddress, gas: 3000000 });
+        
         // payload = {...payload, userDataHash: addUserMetadataToIPFS};
-        return Model.findByIdAndUpdate(userDetails.id, payload);
+        const userModelUpdated = await Model.findByIdAndUpdate(userDetails.id, payload);
+
+        return userModelUpdated;  
     }
 
     async associateUsersToGroup(usersListToAdd, contractAddress, group) {
