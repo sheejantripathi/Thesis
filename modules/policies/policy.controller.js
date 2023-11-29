@@ -1,14 +1,17 @@
 const moment = require("moment");
 const Model = require("./policy.model");
-const { Web3 } = require('web3');
-const providers = new Web3.providers.HttpProvider('http://127.00.1:7545');
-let web3 = new Web3(providers);
-
+// const Web3 = require("web3");
+// const web3 = new Web3(new Web3.providers.HttpProvider('http://localhost:7545'));
+// let web3 = new Web3(providers);
+const Web3 = require("web3");
+require('dotenv').config();
+const web3 = new Web3(`${process.env.INFURA_API_KEY}`);
+const network = process.env.ETHEREUM_NETWORK;
 
 const transactionController = require("../transactions/transactions.controller");
 const userController = require("../users/user.controller");
 const fs = require('fs');
-require('dotenv').config();
+// require('dotenv').config();
 const { PINATA_API_KEY, PINATA_SECRET_API_KEY} = process.env;
 console.log(PINATA_API_KEY, PINATA_SECRET_API_KEY, 'PINATA_API_KEY, Pinata_SECRET_API_KEY')
 // const {ethers} = require('ethers');
@@ -17,8 +20,10 @@ console.log(PINATA_API_KEY, PINATA_SECRET_API_KEY, 'PINATA_API_KEY, Pinata_SECRE
 const instanceController = require('../contractInstances/instances.controller');
 const crypto = require('crypto');
 
+
 // Use the JWT key
 const pinataSDK = require('@pinata/sdk');
+const c = require("config");
 const PinataClient = new pinataSDK(PINATA_API_KEY, PINATA_SECRET_API_KEY);
 
 class PolicyController {
@@ -36,70 +41,57 @@ class PolicyController {
     return { kernel, author };
   }
 
-  async deployAttributeBasedContract(payload) {
+  async deployAttributeBasedContractSepolia(payload) {
     const network = process.env.ETHEREUM_NETWORK;
     let web3 = new Web3(`${process.env.INFURA_API_KEY}`);
- 
+    
     const { policies, group_owner } = payload;
     let transaction_results = [];
-    // const policyInstance = await instanceController.createPolicyContractInstanceSepolia(); //createPolicyContractInstance is the function that creates the instance of the smart contract
-    const policyInstance = await instanceController.createPolicyContractInstance(); //createPolicyContractInstance is the function that creates the instance of the smart contract
+    const policyInstance = await instanceController.createPolicyContractInstanceSepolia();
+    // const policyInstance = await instanceController.createPolicyContractInstance(); 
+    console.log(policyInstance.methods) //createPolicyContractInstance is the function that creates the instance of the smart contract
+    //createPolicyContractInstance is the function that creates the instance of the smart contract
     for (let i = 0; i < policies.length; i++) {
         try {
-            let result = await policyInstance.methods.createGroupContract(
-                policies[i].group,
-                policies[i].permissions,
-                policies[i].organizations,
-                policies[i].countries,
-            ).send({ from: group_owner, gas: 3000000} ) //createChildContract is the function in the smart contract that generates the child contract
-          
-            console.log(result, 'result after creating a child contract')
-            // // Issuing a transaction that calls the `echo` method
-            // const method_abi = policyInstance.methods.createChildContract(
-            //   policies[i].group,
-            //   group_owner,
-            //   policies[i].permissions,
-            //   policies[i].organizations[0],
-            //   policies[i].countries[0]).encodeABI();
+            const method_abi = policyInstance.methods.createGroupContract(
+            policies[i].group,
+            policies[i].permissions,
+            policies[i].organizations,
+            policies[i].countries).encodeABI();
 
-            // const tx = {
-            //   from: group_owner,
-            //   to: policyInstance.options.address,
-            //   data: method_abi,
-            //   value: '0',
-            //   gasPrice: '1000000000',
-            // };
-            // const gas_estimate = await web3.eth.estimateGas(tx);
-            // tx.gas = gas_estimate;
-            // const signedTx = await web3.eth.accounts.signTransaction(tx, process.env.SIGNER_PRIVATE_KEY);
-            // console.log("Raw transaction data: " + ( signedTx).rawTransaction);
-            // // Sending the transaction to the network
-            // const receipt = await web3.eth
-            //   .sendSignedTransaction(signedTx.rawTransaction)
-            //   .once("transactionHash", (txhash) => {
-            //     console.log(`Mining transaction ...`);
-            //     console.log(`https://${network}.etherscan.io/tx/${txhash}`);
-            //   });
-            // // The transaction is now on chain!
-            // console.log(`Mined in block ${receipt.blockNumber}`);
-            // console.log(receipt, 'result after creating a child contract')
-            // return
-            // extracts the child contract address and tahe attribute hash from the transaction log
-            const {groupName, contractAddress} = await this.extractChildContractAddress(result);
-            // childContractAddress = contractAddress;
-          
-            //save the transaction details in the database
-            const policy_detail = await this.addPolicy(payload);
             
-            let transaction_payload = {...result, group:policies[i].group, policyId:policy_detail._id.toString(),
-              childContractAddress:contractAddress, ownerAddress:group_owner}; //transaction payload to be stored in the database
-/** Indicates the code to associate the files in the smart contract*/
-              // if(filesToBeAssociated.length > 0){
-              //   await this.addFilesToGroupContract(filesToBeAssociated, contractAddress, asset_owner);
-              // }
-            const transaction = await transactionController.addTransaction(transaction_payload);
-            transaction_results.push(transaction);
-              console.log(transaction_results, 'transaction_results')
+          const tx = {
+            from: group_owner,
+            to: policyInstance.options.address,
+            data: method_abi,
+            value: '0',
+            gasPrice: web3.utils.toWei('10', 'gwei')
+          };
+          const gas_estimate = await web3.eth.estimateGas(tx);
+          tx.gas = gas_estimate + 1000000;
+          // console.log(tx,'tx')
+
+          const signedTx = await web3.eth.accounts.signTransaction(tx, process.env.SIGNER_PRIVATE_KEY);
+          // Sending the transaction to the network
+          const receipt = await web3.eth
+            .sendSignedTransaction(signedTx.rawTransaction)
+            .once("transactionHash", (txhash) => {
+              console.log(`Mining transaction ...`);
+              console.log(`https://${network}.etherscan.io/tx/${txhash}`);
+            });
+          // // The transaction is now on chain!
+          // console.log(`Mined in block ${receipt.blockNumber}`);
+          console.log(receipt, 'result after creating a child contract')
+          transaction_results.push(receipt);
+          // const contractAddress = receipt.events.GroupContractCreated.address;
+          // extracts the child contract address and tahe attribute hash from the transaction log
+          const {groupName, contractAddress} = await this.extractChildContractAddress(receipt);
+          console.log(contractAddress, 'contractAddress')
+          
+          let transaction_payload = {...receipt, group:policies[i].group,
+          childContractAddress:contractAddress, ownerAddress:group_owner}; //transaction payload to be stored in the database
+
+          transactionController.addTransaction(transaction_payload);
         } catch (error) {
             console.log('Error processing transaction:', error.message);
             // Handle error if needed
@@ -110,6 +102,77 @@ class PolicyController {
     // Return a success message once all transactions have been successfully processed
     // let addFilesToGroupContract = await this.addFilesToGroupContract(filesToAddInGroupContract, childContractAddress);
     return { success: true, message: 'Group Smart contract deployed successfully', transactionReceipts: transaction_results};
+}
+
+async deployAttributeBasedContractLocal(payload) {
+  // const network = process.env.ETHEREUM_NETWORK;
+  // let web3 = new Web3(`${process.env.INFURA_API_KEY}`);
+  
+  const { policies, group_owner } = payload;
+  let transaction_results = [];
+  // const policyInstance = await instanceController.createPolicyContractInstanceSepolia();
+  const policyInstance = await instanceController.createPolicyContractInstance(); 
+  //createPolicyContractInstance is the function that creates the instance of the smart contract
+  for (let i = 0; i < policies.length; i++) {
+      try {
+          let receipt = await policyInstance.methods.createGroupContract(
+              policies[i].group,
+              policies[i].permissions,
+              policies[i].organizations,
+              policies[i].countries,
+          ).send({ from: group_owner, gas: 3000000} ) //createChildContract is the function in the smart contract that generates the child contract
+        
+          console.log(receipt, 'result after creating a child contract')
+          // Issuing a transaction that calls the `echo` method
+          // const method_abi = policyInstance.methods.createGroupContract(
+          //   policies[i].group,
+          //   policies[i].permissions,
+          //   policies[i].organizations,
+          //   policies[i].countries).encodeABI();
+
+            
+          // const tx = {
+          //   from: group_owner,
+          //   to: policyInstance.options.address,
+          //   data: method_abi,
+          //   value: '0',
+          //   gasPrice: web3.utils.toWei('20', 'gwei')
+          // };
+          // const gas_estimate = await web3.eth.estimateGas(tx);
+          // tx.gas = gas_estimate + 1000000;
+          // // console.log(tx,'tx')
+
+          // const signedTx = await web3.eth.accounts.signTransaction(tx, process.env.SIGNER_PRIVATE_KEY);
+          // // Sending the transaction to the network
+          // const receipt = await web3.eth
+          //   .sendSignedTransaction(signedTx.rawTransaction)
+          //   .once("transactionHash", (txhash) => {
+          //     console.log(`Mining transaction ...`);
+          //     console.log(`https://${network}.etherscan.io/tx/${txhash}`);
+          //   });
+          // // The transaction is now on chain!
+          // console.log(`Mined in block ${receipt.blockNumber}`);
+          // console.log(receipt, 'result after creating a child contract')
+          transaction_results.push(receipt);
+            const contractAddress = receipt.events.GroupContractCreated.address;
+            // extracts the child contract address and tahe attribute hash from the transaction log
+            // const {groupName, contractAddress} = await this.extractChildContractAddress(receipt);
+            console.log(contractAddress, 'contractAddress')
+            
+            let transaction_payload = {...receipt, group:policies[i].group,
+            childContractAddress:contractAddress, ownerAddress:group_owner}; //transaction payload to be stored in the database
+
+            transactionController.addTransaction(transaction_payload);
+      } catch (error) {
+          console.log('Error processing transaction:', error.message);
+          // Handle error if needed
+          // You can choose to rethrow the error or return a specific message indicating failure
+          return { success: false, message: 'Error processing transaction' };
+      }
+  }
+  // Return a success message once all transactions have been successfully processed
+  // let addFilesToGroupContract = await this.addFilesToGroupContract(filesToAddInGroupContract, childContractAddress);
+  return { success: true, message: 'Group Smart contract deployed successfully', transactionReceipts: transaction_results};
 }
 
 async addFilesToGroupContract(filesToAddInGroupContract, childContractAddress, userAddress) {
@@ -135,7 +198,7 @@ async extractChildContractAddress(transactionReceipt) {
     },
     {
       type: 'address',
-      name: 'childContract'
+      name: 'groupContract'
     }
   ];
   
@@ -143,7 +206,7 @@ async extractChildContractAddress(transactionReceipt) {
 
   const contractAddressEvent = web3.eth.abi.decodeLog(inputs,logs[0].data, logs[0].topics)
  
-  return {groupName: contractAddressEvent.group, contractAddress: contractAddressEvent.childContract};
+  return {groupName: contractAddressEvent.group, contractAddress: contractAddressEvent.groupContract};
 }
 
 async checkReceiptStatus(transactionHash) {
@@ -212,7 +275,7 @@ async createNode () {
   })
 }
 
-  async heliaFileUploader(filesToUpload, asset_owner) {
+async heliaFileUploader(filesToUpload, asset_owner) {
     console.log(filesToUpload, 'fileData')
     const { createHelia } = await import('helia')
     const { unixfs } = await import('@helia/unixfs')
@@ -294,22 +357,6 @@ for (const file of filesToUpload) {
 //     return {fileCid: fileCid.toString(), dirCid: dirCid.toString()};
     // console.log('Added file contents:', text)
   }
-
-//   async heliaUploadAndPin() {
-//     import { unixfs } from '@helia/unixfs'
-//     import { Configuration, RemotePinningServiceClient } from '@ipfs-shipyard/pinning-service-client'
-//     import { createHelia } from 'helia'
-//     import { createRemotePinner } from '@helia/remote-pinning'
-
-// const helia = await createHelia()
-// const pinServiceConfig = new Configuration({
-//   endpointUrl: `${endpointUrl}`, // the URI for your pinning provider, e.g. `http://localhost:3000`
-//   accessToken: `${accessToken}` // the secret token/key given to you by your pinning provider
-// })
-
-// const remotePinningClient = new RemotePinningServiceClient(pinServiceConfig)
-// const remotePinner = createRemotePinner(helia, remotePinningClient)
-//   }
 
   async IPFSPinning(fileData) {
    
@@ -398,11 +445,22 @@ for (const file of filesToUpload) {
     }
   }
 
-  async fetchContractDetails(childContractAddress, ownerAddress) {
+  async fetchContractDetails(groupContractAddress, ownerAddress) {
     try {
-      const childContractinstance = await instanceController.createChildContractInstance(childContractAddress);  
-      const values = await childContractinstance.methods.getContractDetails().call({ from: ownerAddress});
-      return values;
+      console.log(groupContractAddress, 'groupContractAddress')
+      // const policyFactoryInstance = await instanceController.createPolicyContractInstanceSepolia();
+      // extracts the child contract address and tahe attribute hash from the transaction log
+      
+      // const groupContractAddresses = await policyFactoryInstance.methods.getGroupContractAddresses(ownerAddress).call({ from: ownerAddress});
+      // console.log(groupContractAddresses, 'groupContractAddresses')
+      // return
+      const groupContractinstance = await instanceController.createGroupContractInstanceSepolia(groupContractAddress);  
+      console.log(groupContractinstance.methods, 'groupContractinstance.methods')
+      const groupContractDetails = await groupContractinstance.methods.getContractDetails().call({ from: ownerAddress});
+      console.log(groupContractDetails, 'groupContractDetails') 
+      // const values = await groupContractinstance.methods.getContractDetails().call({ from: ownerAddress, gas: 2000000});
+      // console.log(values)
+      return groupContractDetails;
     } catch (error) {
       console.error('Error fetching contract details:', error);
     }
@@ -446,10 +504,10 @@ for (const file of filesToUpload) {
   
 async addUsersToGroup(contractDetails, userAddress) {
   const {contractAddress, usersListToAdd, filesToAdd, groupName} = contractDetails;
-  await instanceController.addGroupsToUserContract(contractAddress, groupName, usersListToAdd); 
-  
-  const childContractinstance = await instanceController.createChildContractInstance(contractAddress); 
-
+   // const childContractinstance = await instanceController.createChildContractInstance(contractAddress); 
+   console.log(contractAddress, 'contractAddress')
+  const groupContractinstance = await instanceController.createGroupContractInstanceSepolia(contractAddress);  
+  console.log(groupContractinstance.options.address, 'groupContractinstance.options.address')
   for(let i = 0; i < usersListToAdd.length; i++){
     let fromTimestamp = new Date(usersListToAdd[i].accessFrom).getTime() / 1000;
     let toTimestamp = new Date(usersListToAdd[i].accessTo).getTime() / 1000;
@@ -457,14 +515,58 @@ async addUsersToGroup(contractDetails, userAddress) {
     usersListToAdd[i].accessTo = toTimestamp;
   }
  
-  let filesAssociatedTOGroup = await childContractinstance.methods.addFilesToGroup(filesToAdd)
-  .send({ from: userAddress, gas: 2000000} )
+  const groupsAddedToUserContract = await instanceController.addGroupsToUserContract(contractAddress, groupName, usersListToAdd); 
+ 
+  let filesAssociatedToGroup = groupContractinstance.methods.addFilesToGroup(filesToAdd).encodeABI();
+  // .send({ from: userAddress, gas: 2000000} )
 
-  let receipt = await childContractinstance.methods.associateUsersToGroup(usersListToAdd)
-  .send({ from: userAddress, gas: 2000000} )
-  // let user_details = await userController.findAllUsers({publicAddresses: contractDetails.eoaAddresses});
-  // return
+  let usersAssociatedResult = groupContractinstance.methods.associateUsersToGroup(usersListToAdd).encodeABI();
+  // .send({ from: userAddress, gas: 2000000} )
+  
 
+  //tx1 for adding files to the group
+  const tx1 = {
+    from: userAddress,
+    to: groupContractinstance.options.address,
+    data: filesAssociatedToGroup,
+    value: '0',
+    gasPrice: '100000000000',
+  };
+  const gas_estimate1 = await web3.eth.estimateGas(tx1);
+  tx1.gas = gas_estimate1 + 1000000;
+  const signedTx1 = await web3.eth.accounts.signTransaction(tx1, process.env.SIGNER_PRIVATE_KEY);
+  // Sending the transaction to the network
+  const receipt1 = await web3.eth
+    .sendSignedTransaction(signedTx1.rawTransaction)
+    .once("transactionHash", (txhash) => {
+      console.log(`Mining transaction ...`);
+      console.log(`https://${network}.etherscan.io/tx/${txhash}`);
+    });
+
+  //tx2 fro associating users
+  const tx2 = {
+    from: userAddress,
+    to: groupContractinstance.options.address,
+    data: usersAssociatedResult,
+    value: '0',
+    gasPrice: '100000000000',
+  };
+  const gas_estimate2 = await web3.eth.estimateGas(tx2);
+  tx2.gas = gas_estimate2 + 1000000;
+  
+
+    //signed tx 2
+    const signedTx2 = await web3.eth.accounts.signTransaction(tx2, process.env.SIGNER_PRIVATE_KEY);
+  // Sending the transaction to the network
+  const receipt2 = await web3.eth
+    .sendSignedTransaction(signedTx2.rawTransaction)
+    .once("transactionHash", (txhash) => {
+      console.log(`Mining transaction ...`);
+      console.log(`https://${network}.etherscan.io/tx/${txhash}`);
+    });
+  
+    console.log(receipt1, 'receipt1 addFilesToGroup')
+    console.log(receipt2, 'receipt2 associateUsersToGroup')
   let userUpdated = await userController.associateUsersToGroup(usersListToAdd, contractAddress, groupName);
   // Check the modified document count to ensure successful updates
   if (userUpdated.nModified > 0) {

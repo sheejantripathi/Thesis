@@ -1,8 +1,15 @@
-const { Web3 } = require('web3');
+// const { Web3 } = require('web3');
 // const web3 = new Web3("https://rpc2.sepolia.org");
-const providers = new Web3.providers.HttpProvider('http://127.00.1:7545');
-require('dotenv').config();
-let web3 = new Web3(providers);
+// var Web3 = require('web3'); 
+// var web3 = new Web3();
+// require('dotenv').config();
+
+const Web3 = require("web3");
+// const providers = new Web3.providers.HttpProvider('http://127.0.0.1:7545');
+// let web3 = new Web3(providers);
+
+const web3 = new Web3(`${process.env.INFURA_API_KEY}`);
+const network = process.env.ETHEREUM_NETWORK;
 
 const { Readable } = require('stream');
 const crypto = require('crypto');
@@ -21,6 +28,9 @@ const userMetadataFactory = require('../../build/contracts/UserMetadataFactory.j
 const userMetadata = require('../../build/contracts/UserMetadata.json');
 
 
+
+
+
 // const {encryptFile} = require('./ipfs-encrypt');
 
 // const pinatasdk = require('api')('@pinata-cloud/v1.0#12ai2blmsggcsb');
@@ -30,6 +40,7 @@ async function createPolicyContractInstance() {
     //     new Web3(`${process.env.INFURA_API_KEY}`)
     //   );  
     const networkId = await web3.eth.net.getId();
+    console.log(networkId, 'networkId')
     const deployedNetwork = policyManager.networks[networkId];
     const instance = new web3.eth.Contract(
         policyManager.abi,
@@ -38,36 +49,8 @@ async function createPolicyContractInstance() {
     return instance;
 }
 
-async function createPolicyContractInstanceSepolia() {
-     // Configuring the connection to an Ethereum node
-  const network = process.env.ETHEREUM_NETWORK;
-  const web3 = new Web3(
-    new Web3(`${process.env.INFURA_API_KEY}`)
-  );
-  // Creating a signing account from a private key
-  const signer = web3.eth.accounts.privateKeyToAccount(
-    "0x" + process.env.SIGNER_PRIVATE_KEY
-  );
-  web3.eth.accounts.wallet.add(signer);
-  // Creating a Contract instance
-  const contract = new web3.eth.Contract(
-    policyManager.abi,
-    // Replace this with the address of your deployed contract
-    process.env.DEMO_CONTRACT,
-  );
-
-  return contract;
-}
-
-async function createChildContractInstance(contractAddress) {
-    const instance = new web3.eth.Contract(
-        groupcontract.abi,
-        contractAddress
-    );
-    return instance;
-}
-
 async function createUserFactoryContractInstance() {
+  console.log("I am here")
   const networkId = await web3.eth.net.getId();
   const deployedNetwork = userMetadataFactory.networks[networkId];
   const instance = new web3.eth.Contract(
@@ -77,13 +60,91 @@ async function createUserFactoryContractInstance() {
   return instance;
 }
 
-async function createUserMetadataInstance(contractAddress) {
-  const instance = new web3.eth.Contract(
-    userMetadata.abi,
-      contractAddress
+async function createPolicyContractInstanceSepolia() {
+     // Configuring the connection to an Ethereum node
+  
+  const web3Sepolia = new Web3(
+    new Web3(`${process.env.INFURA_API_KEY}`)
   );
-  return instance;
+  // Creating a signing account from a private key
+  const signer = web3Sepolia.eth.accounts.privateKeyToAccount(
+    "0x" + process.env.SIGNER_PRIVATE_KEY
+  );
+  web3Sepolia.eth.accounts.wallet.add(signer);
+  // Creating a Contract instance
+  const contract = new web3Sepolia.eth.Contract(
+    policyManager.abi,
+    // Replace this with the address of your deployed contract
+    process.env.POLICY_MANAGER,
+  );
+
+  return contract;
 }
+
+async function createUserFactoryContractInstanceSepolia() {
+  // Configuring the connection to an Ethereum node
+
+  const web3Sepolia = new Web3(
+  new Web3(`${process.env.INFURA_API_KEY}`)
+  );
+  // Creating a signing account from a private key
+  const signer = web3Sepolia.eth.accounts.privateKeyToAccount(
+  "0x" + process.env.SIGNER_PRIVATE_KEY
+  );
+  web3Sepolia.eth.accounts.wallet.add(signer);
+  // Creating a Contract instance
+  const contract = new web3.eth.Contract(
+    userMetadataFactory.abi,
+  // Replace this with the address of your deployed contract
+  process.env.USER_METADATA_FACTORY,
+  );
+
+  return contract;
+}
+
+
+async function createChildContractInstance(contractAddress) {
+    const instance = new web3.eth.Contract(
+        groupcontract.abi,
+        contractAddress
+    );
+    return instance;
+}
+
+async function createUserMetadataInstance(contractAddress) {
+  const web3Sepolia = new Web3(
+    new Web3(`${process.env.INFURA_API_KEY}`)
+    );
+    // Creating a signing account from a private key
+    const signer = web3.eth.accounts.privateKeyToAccount(
+    "0x" + process.env.SIGNER_PRIVATE_KEY
+    );
+    web3Sepolia.eth.accounts.wallet.add(signer);
+    // Creating a Contract instance
+    const instance = new web3Sepolia.eth.Contract(
+      userMetadata.abi,
+      contractAddress
+    );
+    return instance;
+}
+
+async function createGroupContractInstanceSepolia(contractAddress) {
+  const web3Sepolia = new Web3(
+    new Web3(`${process.env.INFURA_API_KEY}`)
+    );
+    // Creating a signing account from a private key
+    const signer = web3.eth.accounts.privateKeyToAccount(
+    "0x" + process.env.SIGNER_PRIVATE_KEY
+    );
+    web3Sepolia.eth.accounts.wallet.add(signer);
+    // Creating a Contract instance
+    const instance = new web3Sepolia.eth.Contract(
+      groupcontract.abi,
+      contractAddress
+    );
+    return instance;
+}
+
 
 async function encryptFile(file) {
     try {
@@ -223,18 +284,20 @@ async function getFilesAssociatedWithUser(userAddress) {
 }
 
 async function getuserGroupDetials(userAddress) {
-    const userMetadataFactoryInstance = await createUserFactoryContractInstance();
+    const userMetadataFactoryInstance = await createUserFactoryContractInstanceSepolia();
     const userContractAddress = await userMetadataFactoryInstance.methods.getUserContractAddress().call({ from: userAddress});
     const userMetadataInstance = await createUserMetadataInstance(userContractAddress);
-
-    const usersGroupInfo = await userMetadataInstance.methods.getUserGroupInfo(userAddress).call({ from: userAddress, gas: 3000000}); 
+    console.log(userAddress, 'userAddress')
+    // const usersGroupInfo = await userMetadataInstance.methods.getUserGroupInfo().call({ from: userAddress, gas: 3000000}); 
+    const usersGroupInfo = await userMetadataInstance.methods.getUserGroupInfo().call({ from: userAddress});
+    console.log(usersGroupInfo, 'usersGroupInfo')
     return usersGroupInfo;
     
 }
 
 async function uploadFileToIPFS(filesToUpload, asset_owner) {
     let filesUploaded = [];
- 
+
     for (const file of filesToUpload) {
         // Process each file here
 
@@ -264,26 +327,76 @@ async function uploadFileToIPFS(filesToUpload, asset_owner) {
         filesUploaded.push(result);
       }
 
-    const userMetadataFactoryInstance = await createUserFactoryContractInstance();
+    const userMetadataFactoryInstance = await createUserFactoryContractInstanceSepolia();
     const userContractAddress = await userMetadataFactoryInstance.methods.getUserContractAddress().call({ from: asset_owner});
-
+    console.log(userContractAddress, 'userContractAddress')
+    
     const userMetadataInstance = await createUserMetadataInstance(userContractAddress);
-
+    // const userContractOwner = await userMetadataInstance.methods.getOwner().call({ from: asset_owner, gas: 3000000});
+    // console.log(userContractOwner, 'userContractOwner') 
+    // return
     const filesWithoutPinSize = filesUploaded.map(({ PinSize, ...rest }) => rest);
 
-    const usersFilesDetailsStored = await userMetadataInstance.methods.uploadFiles(filesWithoutPinSize).send({ from: asset_owner, gas: 3000000 }); 
+    const usersFilesDetailsStored = userMetadataInstance.methods.uploadFiles(filesWithoutPinSize).encodeABI(); 
+    const tx = {
+      from: asset_owner,
+      to: userContractAddress,
+      data: usersFilesDetailsStored,
+      value: '0',
+      gasPrice: '100000000000',
+    };
+    const gas_estimate = await web3.eth.estimateGas(tx);
+    tx.gas = gas_estimate + 100000;
+
+    const signedTx = await web3.eth.accounts.signTransaction(tx, process.env.SIGNER_PRIVATE_KEY);
+    // Sending the transaction to the network
+    const receipt = await web3.eth
+      .sendSignedTransaction(signedTx.rawTransaction)
+      .once("transactionHash", (txhash) => {
+        console.log(`Mining transaction ...`);
+        console.log(`https://${network}.etherscan.io/tx/${txhash}`);
+      });
+    // The transaction is now on chain!
+    console.log(receipt, 'result after uploading a file')
     return usersFilesDetailsStored; 
 }
 
 async function addGroupsToUserContract(groupContractAddress, groupName, usersListToAdd) {
-  const userMetadataFactoryInstance = await createUserFactoryContractInstance();
+  const userMetadataFactoryInstance = await createUserFactoryContractInstanceSepolia();
   for(const user of usersListToAdd){
     const userContractAddress = await userMetadataFactoryInstance.methods.getUserContractAddress().call({ from: user.eoaAddress});
+    console.log(userContractAddress, 'userContractAddress')
     const userMetadataInstance = await createUserMetadataInstance(userContractAddress);
-    const groupsAddeddToUserContract = await userMetadataInstance.methods.associateToGroup(groupName, groupContractAddress).send({ from: user.eoaAddress, gas: 3000000 }); 
+    if (userContractAddress === '0x0000000000000000000000000000000000000000') {
+      console.log("User contract does not exist")
+      return {success: false, message: "User contract does not exist"}
+    } else {
+      const doesUserContractExist = userMetadataFactoryInstance.methods.doesUserContractExist(user.eoaAddress);
+      const usersFilesDetailsStored = userMetadataInstance.methods.associateToGroup(groupName, groupContractAddress).encodeABI() 
+
+      const tx = {
+        from: user.eoaAddress,
+        to: userContractAddress,
+        data: usersFilesDetailsStored,
+        value: '0',
+        gasPrice: '100000000000',
+      };
+      const gas_estimate = await web3.eth.estimateGas(tx);
+      tx.gas = gas_estimate + 100000;
+      
+      const signedTx = await web3.eth.accounts.signTransaction(tx, process.env.SIGNER_PRIVATE_KEY_SECOND);
+      // Sending the transaction to the network
+      const receipt = await web3.eth
+        .sendSignedTransaction(signedTx.rawTransaction)
+        .once("transactionHash", (txhash) => {
+          console.log(`Mining transaction ...`);
+          console.log(`https://${network}.etherscan.io/tx/${txhash}`);
+        });
+        
+      return receipt;
+
+    }
   }
- 
-  return usersListToAdd; 
 }
 
 async function updateIPFSFileMetadata(ipfsPinHash, contractAddress, contractName) {
@@ -313,5 +426,7 @@ module.exports = {
     updateIPFSFileMetadata,
     encryptStreamAndUploadToIPFS,
     createPolicyContractInstanceSepolia,
+    createUserFactoryContractInstanceSepolia,
+    createGroupContractInstanceSepolia,
     decryptFile
 };

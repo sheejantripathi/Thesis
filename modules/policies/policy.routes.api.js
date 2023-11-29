@@ -1,15 +1,9 @@
 const router = require("express").Router();
-const { Web3 } = require('web3');
 const Controller = require("./policy.controller");
 const authenticateToken = require("../../helpers/utils/jwt-middleware");
-const config = require("./config");
-
-const providers = new Web3.providers.HttpProvider('http://127.00.1:7545');
-var web3 = new Web3(providers)
 
 const multer = require("multer");
 const policyController = require("./policy.controller");
-const upload = multer({ dest: "uploads/" });
 
 // API to add the custom policies
 router.post('/add', authenticateToken, async (req, res, next) => {
@@ -20,7 +14,7 @@ router.post('/add', authenticateToken, async (req, res, next) => {
       group_owner: req.user.publicAddress
     };
 
-    await policyController.deployAttributeBasedContract(payload);
+    await policyController.deployAttributeBasedContractSepolia(payload);
     
     res.send({success:true, message: "Policy successfully added"})
   } catch (error) {
@@ -68,7 +62,7 @@ router.get('/get-access', authenticateToken, async (req, res, next) => {
 });
 
 
-
+// API to associate users to the group
 router.post('/add-users-to-group', authenticateToken, async (req, res, next) => {
   try {
     const payload = {
@@ -86,7 +80,6 @@ router.post('/add-users-to-group', authenticateToken, async (req, res, next) => 
   }
 });
 
-
 router.post('/add-files-to-group', authenticateToken, async (req, res, next) => {
   try {
     const groupContractAddress = req.query? req.query.groupContractAddress:'';
@@ -97,19 +90,6 @@ router.post('/add-files-to-group', authenticateToken, async (req, res, next) => 
     // console.log(user_assigned_to_child_contract, 'user_assigned_to_child_contract');
     res.send("Files successfully shared within the group")
     // res.json(registerUserDetails);
-  } catch (error) {
-    next(error);
-  }
-});
-
-
-
-router.get('/pinata-test',  async (req, res, next) => { 
-  try {
-    // const childContractAddress = req.query? req.query.childContractAddress:'';
-  await Controller.pinataTest()
-  .then((result) => {  console.log(result, 'result')})
-  .catch((err) => { console.log(err, 'err')})
   } catch (error) {
     next(error);
   }
@@ -126,4 +106,5 @@ router.post('/asset-upload',authenticateToken, async (req, res, next) => {
   .then((uploadedFiles) => res.json(uploadedFiles))
   .catch((err)=> console.log(err));
 });
+
 module.exports = router;

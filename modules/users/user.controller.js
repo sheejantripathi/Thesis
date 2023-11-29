@@ -1,6 +1,9 @@
 const Model = require("./user.model");
 const instanceController = require('../contractInstances/instances.controller');
-
+const Web3 = require("web3");
+require('dotenv').config();
+const web3 = new Web3(`${process.env.INFURA_API_KEY}`);
+const network = process.env.ETHEREUM_NETWORK;
 
 class UserController {
     async findUser(payload) {
@@ -28,13 +31,55 @@ class UserController {
     }
 
     async updateUser(userDetails, payload) {
+    
         const {organization, country, username} = payload;
-      
-        let userContractInstance = await instanceController.createUserFactoryContractInstance();
-        const userRegistered = await userContractInstance.methods.createUserContract(organization, country)
-        .send({ from: userDetails.publicAddress, gas: 3000000 });
         
-        // payload = {...payload, userDataHash: addUserMetadataToIPFS};
+        // let userContractInstance = await instanceController.createUserFactoryContractInstance();
+        const userMetadataFactoryInstance = await instanceController.createUserFactoryContractInstanceSepolia();
+        console.log(userMetadataFactoryInstance.options.address, 'userMetadataFactoryInstance.options.address')
+        
+        const method_abi = userMetadataFactoryInstance.methods.createUserContract(userDetails.publicAddress, organization, country).encodeABI();        
+        console.log(method_abi, 'method_abi')
+        
+        const tx = {
+          from: userDetails.publicAddress,
+          to: userMetadataFactoryInstance.options.address,
+          data: method_abi,
+          value: '0',
+          gasPrice: '100000000000',
+        };
+        
+        const gas_estimate = await web3.eth.estimateGas(tx);
+        console.log(gas_estimate, 'gas_estimate')
+        tx.gas = gas_estimate + 1000000;
+        
+        const signedTx = await web3.eth.accounts.signTransaction(tx, process.env.SIGNER_PRIVATE_KEY_SECOND);
+        // Sending the transaction to the network
+        const receipt = await web3.eth
+          .sendSignedTransaction(signedTx.rawTransaction)
+          .once("transactionHash", (txhash) => {
+            console.log(`Mining transaction ...`);
+            console.log(`https://${network}.etherscan.io/tx/${txhash}`);
+          });
+        // The transaction is now on chain!
+        console.log(`Mined in block ${receipt.blockNumber}`);
+        console.log(receipt, 'result after creating a child contract')
+        // console.log(tx, 'tx')
+
+        // const new_ac = "85ebb4df48881d5ae66122fb468f341881c5fb7d9fcffef5f947142bee752d96"
+        // // const signedTx = await web3.eth.accounts.signTransaction(tx, process.env.SIGNER_PRIVATE_KEY);
+        // const signedTx = await web3.eth.accounts.signTransaction(tx, new_ac);
+        // console.log(signedTx, 'signedTx')
+
+        // // Sending the transaction to the network
+        // await web3.eth
+        //   .sendSignedTransaction(signedTx.rawTransaction)
+        //   .once("transactionHash", (txhash) => {
+        //     console.log(`Mining transaction ...`);
+        //     console.log(`https://${network}.etherscan.io/tx/${txhash}`);
+        //   });
+        // The transaction is now on chain!
+       
         const userModelUpdated = await Model.findByIdAndUpdate(userDetails.id, payload);
 
         return userModelUpdated;  

@@ -4,9 +4,6 @@ const Controller = require("./user.controller");
 const authenticateToken = require("../../helpers/utils/jwt-middleware");
 const instanceController = require('../contractInstances/instances.controller');
 const crypto = require('crypto');
-const NodeRSA = require('node-rsa');
-
-
 
 /** GET /api/users */
 router.get('/', async (req, res, next) => {
@@ -28,6 +25,8 @@ router.get('/', async (req, res, next) => {
         contractAddress: group.groupContractAddress
       };
     });
+
+    console.log(transformedData, 'transformedData')
     res.json(transformedData)
 	  // await Controller.findUser(whereClause)
 		// .then((users) => res.json(users))
@@ -64,8 +63,8 @@ router.post('/', async (req, res, next) => {
     .catch((err)=> console.log(err));
   });
 
-/** POST /api/users/asset-upload */
-router.post('/asset-upload',authenticateToken, async (req, res, next) => {
+/** POST /api/users/asset-upload-test*/
+router.post('/asset-upload-test',authenticateToken, async (req, res, next) => {
   if (!req.files) {
     return res.status(400).send('No files uploaded.');
   }
@@ -146,9 +145,9 @@ router.post('/asset-upload',authenticateToken, async (req, res, next) => {
     // .catch((err)=> console.log(err));
   });
 
-/** POST /api/usere/asset-uplaod-test*/
+/** POST /api/usere/asset-uplaod*/
 
-router.post('/asset-upload-test',authenticateToken, async (req, res, next) => {
+router.post('/asset-upload',authenticateToken, async (req, res, next) => {
   if (!req.files) {
       return res.status(400).send('No files uploaded.');
     }
@@ -157,22 +156,9 @@ router.post('/asset-upload-test',authenticateToken, async (req, res, next) => {
 
   const filesToUpload = [].concat(...Object.values(req.files));
 
+
   await instanceController.uploadFileToIPFS(filesToUpload, asset_owner);
   res.json({message: 'Files successfully uploaded to IPFS', success: true});
-  // const factoryContractInstance = await instanceController.createPolicyContractInstance();
-  // let updatedUsersList = [];
-  // for (file of ipfsUploadResults) {
-  //   const fileContractResult = await factoryContractInstance.methods.createFileContract(file.fileName, file.IpfsHash).send({ from: asset_owner, gas: 3000000 });
-  
-  //   const updatedUser = await Controller.associateFilesToOwner({
-  //     eoaAddress: asset_owner,
-  //     contractAddress: fileContractResult.to,
-  //     fileName: file.name
-  //   });
-  //   updatedUsersList.push(updatedUser);
-  // }
-
-  // res.json(updatedUsersList);
 });
 
 
@@ -189,7 +175,7 @@ router.post('/asset-download',authenticateToken, async (req, res, next) => {
   });
 /** PATCH /api/users/:userId */
 /** Authenticated route */
-router.put('/:userId',authenticateToken, async (req, res, next) => {
+router.post('/:userId',authenticateToken, async (req, res, next) => {
     if (req.user.id !== req.params.userId) {
         return res
             .status(401)
@@ -200,17 +186,13 @@ router.put('/:userId',authenticateToken, async (req, res, next) => {
         .then((user) => {
             if (!user) {
                 console.log('Such user does not exist')
-                return
+                res.status(401).send({
+                  error: `User with publicAddress ${req.params.userId} is not found in database`,
+            })
             }
-
-            return user
-        })
-        .then((user) => {
-            return user
-                ? res.json(user)
-                : res.status(401).send({
-                        error: `User with publicAddress ${req.params.userId} is not found in database`,
-                  });
+            else{
+              res.json(user)
+            } 
         })
         .catch(next);
   });
