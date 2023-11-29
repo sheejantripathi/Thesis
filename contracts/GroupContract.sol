@@ -98,7 +98,7 @@ contract GroupContract {
         for (uint256 i = 0; i < fileDetails.length; i++) {
             FileDetails memory fDetail = fileDetails[i];
             string memory IPFSHash = fDetail.IPFSHash;
-            // require(sharedIPFSHashes[IPFSHash], "IPFS hash already shared with this contract");
+            // require(sharedIPFSHashes[IPFSHash] =! false, "IPFS hash already shared with this contract");
             sharedIPFSHashes[IPFSHash] = true;
             addedFileDetails.push(fDetail);
             emit Success("Files successfullly shared in the group");

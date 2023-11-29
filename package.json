@@ -39,6 +39,7 @@
     "axios": "^1.5.1",
     "blockstore-core": "^4.3.4",
     "body-parser": "^1.20.2",
+    "chai": "^4.3.10",
     "config": "^3.3.9",
     "connect-multiparty": "^2.2.0",
     "cors": "^2.8.5",
@@ -59,9 +60,8 @@
     "mongoose": "^7.4.1",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
-    "node-rsa": "^1.1.1",
     "nodemon": "^3.0.1",
-    "web3": "^4.2.2",
+    "web3": "^1.10.3",
     "web3.storage": "^4.5.5",
     "ws": "^8.13.0"
   }

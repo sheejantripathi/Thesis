@@ -3,6 +3,7 @@ pragma solidity >=0.7.0 <0.9.0;
 
 contract UserMetadata {
 
+    address public owner;
     struct FileDetails {
         string IpfsHash;
         string Timestamp;
@@ -29,43 +30,76 @@ contract UserMetadata {
     event FileUploaded(address indexed userAddress, string name, string IPFSHash);
     event UserAssociatedToGroup(address indexed userAddress, string groupName, address groupContractAddress);
 
-    modifier onlyRegisteredUser(address userAddress) {
-        require(
-            msg.sender == userAddress, 
-            "User not registered or unauthorized"
-        );
+    /**
+     * @dev Only allows the contract owner to execute the function.
+     */
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Caller is not the owner");
         _;
     }
 
-    constructor(address _userAddress, string memory _organization, string memory _country) {
-        UserData storage newUser = userMetadata[_userAddress];
+    /**
+     * @dev Only allows registered and authorized users to execute the function.
+     */
+    modifier onlyAuthorizedUser() {
+        require(userMetadata[msg.sender].isAuthorized, "User not registered or unauthorized");
+        _;
+    }
+
+    /**
+     * @dev Constructor to register a new user.
+     * @param _organization The organization of the user.
+     * @param _country The country of the user.
+     */
+    constructor(address userAddress ,string memory _organization, string memory _country) {
+        owner = userAddress;
+        UserData storage newUser = userMetadata[userAddress];
         newUser.organization = _organization;
         newUser.country = _country;
         newUser.isAuthorized = true;
 
-        emit UserRegistered(_userAddress, _organization, _country);
-        }
+        emit UserRegistered(userAddress, _organization, _country);
+    }
 
+    function getOwner() public view returns (address) {
+        return owner;
+    }
 
-    function getUserMetadata(address userAddress) public view onlyRegisteredUser(userAddress)
+    /**
+     * @dev Gets the metadata of the user.
+     * @return organization The organization of the user.
+     * @return country The country of the user.
+     * @return isAuthorized Whether the user is authorized.
+     */
+    function getUserMetadata() public view onlyOwner
         returns (string memory organization, string memory country, bool isAuthorized) {
-        UserData storage user = userMetadata[userAddress];
+        UserData storage user = userMetadata[owner];
         organization = user.organization;
         country = user.country;
         isAuthorized = user.isAuthorized;
     }
 
-    function getUserFiles(address userAddress, string memory fileName) public view onlyRegisteredUser(userAddress)
+    /**
+     * @dev Gets the files of the user.
+     * @param fileName The name of the file.
+     * @return name The name of the file.
+     * @return IpfsHash The IPFS hash of the file.
+     */
+    function getUserFiles(string memory fileName) public view onlyOwner
         returns (string memory name, string memory IpfsHash) {
-        FileDetails storage file = userMetadata[userAddress].files[fileName];
+        FileDetails storage file = userMetadata[msg.sender].files[fileName];
         name = file.name;
         IpfsHash = file.IpfsHash;
     }
 
-   function getUserGroupInfo(address userAddress) public view onlyRegisteredUser(userAddress)
+    /**
+     * @dev Gets the group information of the user.
+     * @return allGroupInfos Array of GroupInfo structures.
+     */
+    function getUserGroupInfo() public view onlyOwner
         returns (GroupInfo[] memory) {
 
-        UserData storage user = userMetadata[userAddress];
+        UserData storage user = userMetadata[msg.sender];
         uint256 groupCount = user.groupNames.length;
 
         GroupInfo[] memory allGroupInfos = new GroupInfo[](groupCount);
@@ -78,26 +112,35 @@ contract UserMetadata {
         return allGroupInfos;
     }
 
+    /**
+     * @dev Uploads files for the user.
+     * @param fileDetails Array of FileDetails structures.
+     */
+    function uploadFiles(FileDetails[] memory fileDetails) public onlyOwner {
+        for (uint256 i = 0; i < fileDetails.length; i++) {
+            string memory IpfsHash = fileDetails[i].IpfsHash;
+            string memory Timestamp = fileDetails[i].Timestamp;
+            string memory name = fileDetails[i].name;
 
-    function uploadFiles(FileDetails[] memory fileDetails) public onlyRegisteredUser(msg.sender) {
-    for (uint256 i = 0; i < fileDetails.length; i++) {
-        string memory IpfsHash = fileDetails[i].IpfsHash;
-        string memory Timestamp = fileDetails[i].Timestamp;
-        string memory name = fileDetails[i].name;
+            // Ensure unique file names
 
-        // Ensure unique file names
+            userMetadata[msg.sender].files[name] = FileDetails({
+                name: name,
+                IpfsHash: IpfsHash,
+                Timestamp: Timestamp
+            });
 
-        userMetadata[msg.sender].files[name] = FileDetails({
-            name: name,
-            IpfsHash: IpfsHash,
-            Timestamp: Timestamp
-        });
-
-        emit FileUploaded(msg.sender, name, IpfsHash);
+            emit FileUploaded(msg.sender, name, IpfsHash);
+        }
     }
-}
 
-    function associateToGroup(string memory groupName, address groupContractAddress) public onlyRegisteredUser(msg.sender) {
+
+    /**
+     * @dev adds the group details of the user selected to be associated with the group contract.
+     * @param groupName name of the group to be associated with the user.
+     * @param groupContractAddress contract address of the group to be associated with the user.
+     */
+    function associateToGroup(string memory groupName, address groupContractAddress) public onlyAuthorizedUser {
         require(bytes(groupName).length > 0, "Group name cannot be empty");
 
         UserData storage user = userMetadata[msg.sender];
